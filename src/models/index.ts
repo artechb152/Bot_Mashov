@@ -1,0 +1,9 @@
+/** Barrel export for all Mongoose models. */
+export { User, type UserDoc } from "./User";
+export { Trainee, type TraineeDoc } from "./Trainee";
+export { TraineeAttachment, type TraineeAttachmentDoc } from "./TraineeAttachment";
+export { Feedback, type FeedbackDoc } from "./Feedback";
+export { Simulation, type SimulationDoc } from "./Simulation";
+export { Scenario, type ScenarioDoc } from "./Scenario";
+export { FinalExercise, type FinalExerciseDoc } from "./FinalExercise";
+export { KnowledgeDocument, type KnowledgeDocumentDoc } from "./KnowledgeDocument";

@@ -1,0 +1,63 @@
+
+> matzpen@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.5.20
+   - Local:        http://localhost:3000
+   - Network:      http://10.10.96.73:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 2s
+ ○ Compiling / ...
+ ✓ Compiled / in 3.6s (737 modules)
+ GET / 200 in 4319ms
+ ○ Compiling /api/auth/signup ...
+ ✓ Compiled /api/auth/signup in 1347ms (764 modules)
+ POST /api/auth/signup 400 in 2172ms
+ POST /api/auth/signup 400 in 15ms
+ POST /api/auth/signup 400 in 19ms
+ POST /api/auth/signup 400 in 17ms
+ ✓ Compiled /signup in 449ms (753 modules)
+ GET /signup 307 in 748ms
+ ✓ Compiled / in 114ms (514 modules)
+ GET / 200 in 290ms
+ ✓ Compiled in 370ms (731 modules)
+ GET / 200 in 182ms
+ GET / 200 in 220ms
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 634ms (170 modules)
+ ○ Compiling /trainees ...
+ ✓ Compiled /trainees in 657ms (807 modules)
+ GET /trainees 200 in 6058ms
+ ○ Compiling /assistant ...
+ ✓ Compiled /assistant in 668ms (831 modules)
+ GET /assistant 200 in 1031ms
+ ✓ Compiled in 501ms (845 modules)
+ GET /assistant 200 in 176ms
+ GET /assistant 200 in 218ms
+ ✓ Compiled in 468ms (845 modules)
+ GET /assistant 200 in 179ms
+ GET /assistant 200 in 207ms
+ GET / 200 in 103ms
+ ✓ Compiled /api/auth/logout in 461ms (850 modules)
+ POST /api/auth/logout 200 in 613ms
+ ✓ Compiled /login in 467ms (863 modules)
+ GET /login 200 in 600ms
+ GET /login 200 in 33ms
+ ✓ Compiled /signup in 189ms (580 modules)
+ GET /signup 200 in 461ms
+ ✓ Compiled /api/auth/signup in 183ms (586 modules)
+ POST /api/auth/signup 201 in 405ms
+ GET / 200 in 77ms
+ GET / 200 in 39ms
+ ✓ Compiled /trainees/new in 480ms (883 modules)
+ GET /trainees/new 200 in 796ms
+ ✓ Compiled /api/trainees in 439ms (901 modules)
+ POST /api/trainees 201 in 561ms
+ GET /trainees/new 200 in 104ms
+ ○ Compiling /trainees/[id] ...
+ ✓ Compiled /trainees/[id] in 729ms (914 modules)
+ GET /trainees/6a4f59deb7a8f76ea4fd426b 200 in 2164ms
+ GET /trainees/6a4f59deb7a8f76ea4fd426b 200 in 308ms
+ GET /trainees 200 in 58ms

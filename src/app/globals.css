@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind CSS v4 — CSS-first theme configuration.
+ *
+ * Semantic design tokens (see DESIGN.md). Each `--color-*` here generates the
+ * matching Tailwind utilities (e.g. `bg-surface`, `text-ink`, `border-line`).
+ * The Hebrew font (Heebo) is injected by `next/font` as `--font-heebo` in the
+ * root layout and wired into the default sans stack below.
+ */
+@theme {
+  --font-sans: var(--font-heebo), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", "Noto Sans Hebrew", Arial, sans-serif;
+
+  /* Restrained, operational neutral palette (monochrome slate + dark action). */
+  --color-canvas: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f5f9;
+  --color-ink: #0f172a;
+  --color-muted: #475569;
+  --color-subtle: #94a3b8;
+  --color-line: #e2e8f0;
+  --color-line-strong: #cbd5e1;
+  --color-primary: #0f172a;
+  --color-primary-ink: #f8fafc;
+  --color-danger: #b91c1c;
+  /* Sanctioned soft error/danger surface (the one allowed colour exception). */
+  --color-danger-surface: #fef2f2;
+  --color-danger-line: #fecaca;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Baseline visible keyboard focus; interactive primitives refine it with rings. */
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: #0f172a;
+    color: #f8fafc;
+  }
+}
