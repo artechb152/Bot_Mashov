@@ -1,10 +1,11 @@
 import { Schema, model, models, type InferSchemaType, type Model } from "mongoose";
-import { COURSE_TYPES, DIFFICULTIES } from "@/lib/domain/types";
+import { COURSE_SCOPES, DIFFICULTIES } from "@/lib/domain/types";
 
 const simulationSchema = new Schema(
   {
     title: { type: String, required: true, trim: true },
-    courseType: { type: String, enum: [...COURSE_TYPES], required: true },
+    // Content scope, not a person's course — a simulation may serve "both".
+    courseType: { type: String, enum: [...COURSE_SCOPES], required: true },
     skills: { type: [String], default: [] },
     difficulty: { type: String, enum: [...DIFFICULTIES], default: "medium" },
     description: { type: String, default: "" },

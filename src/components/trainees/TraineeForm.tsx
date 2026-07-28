@@ -10,9 +10,21 @@ type TraineeFormProps = {
   mode: "create" | "edit";
   /** Required when mode is "edit". */
   initial?: TraineeDTO;
+  /**
+   * API + view roots, so the same form serves the staff path and the admin path:
+   *   - staff (default): POST/PATCH /api/trainees, view /trainees
+   *   - admin: /api/admin/trainees, /admin/trainees
+   */
+  apiBase?: string;
+  viewBase?: string;
 };
 
-export function TraineeForm({ mode, initial }: TraineeFormProps) {
+export function TraineeForm({
+  mode,
+  initial,
+  apiBase = "/api/trainees",
+  viewBase = "/trainees",
+}: TraineeFormProps) {
   const router = useRouter();
 
   const [fullName, setFullName] = useState(initial?.fullName ?? "");
@@ -46,7 +58,7 @@ export function TraineeForm({ mode, initial }: TraineeFormProps) {
     // disabled through the unload (no flash, no double submit).
     let navigating = false;
     try {
-      const url = mode === "create" ? "/api/trainees" : `/api/trainees/${initial!.id}`;
+      const url = mode === "create" ? apiBase : `${apiBase}/${initial!.id}`;
       const res = await fetch(url, {
         method: mode === "create" ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -67,7 +79,7 @@ export function TraineeForm({ mode, initial }: TraineeFormProps) {
       // combo could race and leave the button stuck on "שומר…".)
       const id = data.trainee?.id ?? initial?.id;
       navigating = true;
-      window.location.assign(id ? `/trainees/${id}` : "/trainees");
+      window.location.assign(id ? `${viewBase}/${id}` : viewBase);
     } catch {
       setError("שמירת החניך נכשלה. בדקו את החיבור ונסו שוב.");
     } finally {

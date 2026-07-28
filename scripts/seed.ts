@@ -6,7 +6,13 @@
  * labelled "דוגמה בלבד" / "תוכן דמו". The goal is to prove the system works,
  * not to author any professional training material.
  *
- * Run:  npm run seed   (requires MONGODB_URI in .env.local)
+ * ⚠️ DESTRUCTIVE. This script DELETES every document in seven collections —
+ * including User and Trainee — before inserting demo data. On a database that
+ * holds real signups and real trainee files, running it destroys them.
+ *
+ * It is therefore guarded: it refuses to run unless SEED_CONFIRM=yes is set.
+ *
+ * Run:  SEED_CONFIRM=yes npm run seed   (requires MONGODB_URI in .env.local)
  */
 import { loadEnvConfig } from "@next/env";
 import mongoose from "mongoose";
@@ -25,6 +31,47 @@ import {
 // so nothing loads the env for us). Must run before we read process.env below.
 loadEnvConfig(process.cwd());
 
+/** The seven collections this script wipes before re-seeding. */
+const WIPED_COLLECTIONS = [
+  "User",
+  "Trainee",
+  "Feedback",
+  "Simulation",
+  "Scenario",
+  "FinalExercise",
+  "KnowledgeDocument",
+] as const;
+
+/**
+ * Hard guard. `npm run seed` is a data-destroying command, so it must never be
+ * possible to fire it by accident (a stray autocomplete, a copied README line,
+ * a CI step). Running it requires opting in explicitly with SEED_CONFIRM=yes.
+ */
+function assertSeedConfirmed(): void {
+  if (process.env.SEED_CONFIRM === "yes") return;
+
+  console.error(
+    [
+      "",
+      "  ⚠️  עצור — הפקודה הזו מוחקת נתונים אמיתיים.",
+      "",
+      "  סקריפט ה-seed מוחק את כל המסמכים באוספים הבאים לפני שהוא מכניס נתוני דמו:",
+      ...WIPED_COLLECTIONS.map((name) => `      · ${name}`),
+      "",
+      "  המשמעות: כל המשתמשים הרשומים, כל החניכים וכל הקבצים המצורפים — יימחקו.",
+      "  אם זו מסד הנתונים שבו יש נתונים אמיתיים, אל תריץ את הפקודה הזו.",
+      "",
+      "  אם אתה בכל זאת בטוח, הרץ עם אישור מפורש:",
+      "",
+      "      SEED_CONFIRM=yes npm run seed",
+      "",
+      "  [seed] aborted: refusing to wipe the database without SEED_CONFIRM=yes.",
+      "",
+    ].join("\n"),
+  );
+  process.exit(1);
+}
+
 async function seed(): Promise<void> {
   if (!process.env.MONGODB_URI) {
     console.error(
@@ -39,8 +86,11 @@ async function seed(): Promise<void> {
     process.exit(1);
   }
 
+  // Must come before any connection/write. Exits the process when not confirmed.
+  assertSeedConfirmed();
+
   await connectToDatabase();
-  console.log("[seed] מחובר. מאפס אוספי דמו…");
+  console.warn("[seed] SEED_CONFIRM=yes — מוחק את אוספי הדמו ומאפס…");
 
   // Reset only the collections we seed (safe on a development database).
   await Promise.all([
@@ -53,17 +103,18 @@ async function seed(): Promise<void> {
     KnowledgeDocument.deleteMany({}),
   ]);
 
-  // 1) One demo commander (passwordHash is a clearly-fake placeholder — no auth yet).
+  // 1) One demo staff user (passwordHash is a clearly-fake placeholder — no auth yet).
   const commander = await User.create({
     fullName: "מפקד לדוגמה",
     username: "mefaked.demo",
     passwordHash: "demo$placeholder-not-a-real-hash",
-    courseType: "both",
-    role: "commander",
+    // A person belongs to exactly one course ("both" is a CONTENT scope only).
+    courseType: "kapeh",
+    role: "staff",
   });
 
-  // 2) Five demo trainees.
-  const traineeCourses = ["kapeh", "maksim", "kapeh", "maksim", "both"] as const;
+  // 2) Five demo trainees. A trainee inherits its commander's single course.
+  const traineeCourses = ["kapeh", "kapeh", "kapeh", "kapeh", "kapeh"] as const;
   const teamLabels = ["א", "ב", "ג", "א", "ב"];
   const trainees = await Trainee.create(
     Array.from({ length: 5 }, (_, i) => ({

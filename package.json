@@ -12,7 +12,13 @@
     "seed": "tsx scripts/seed.ts",
     "db:seed": "tsx scripts/seed.ts",
     "demo:password": "tsx scripts/set-demo-password.ts",
-    "knowledge:sync": "tsx scripts/sync-knowledge.ts"
+    "knowledge:sync": "tsx scripts/sync-knowledge.ts",
+    "admin:create-root": "tsx scripts/create-root.ts",
+    "dev:seed-test-data": "tsx scripts/seed-test-data.ts",
+    "dev:seed-communication-data": "tsx scripts/seed-communication-data.ts",
+    "check:guards": "tsx scripts/check-admin-guards.ts",
+    "check:import": "tsx scripts/check-import-parser.ts",
+    "check:consistency": "tsx scripts/check-consistency.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

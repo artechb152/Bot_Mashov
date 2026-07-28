@@ -25,10 +25,15 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+dev.log
+*.log
 
 # local env files
 .env
 .env*.local
+
+# local-only dev artifacts (e.g. generated test credentials — never commit)
+/.local/
 
 # typescript
 *.tsbuildinfo

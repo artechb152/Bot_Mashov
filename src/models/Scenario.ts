@@ -1,5 +1,5 @@
 import { Schema, model, models, type InferSchemaType, type Model } from "mongoose";
-import { COURSE_TYPES } from "@/lib/domain/types";
+import { COURSE_SCOPES } from "@/lib/domain/types";
 
 /**
  * נע״ת / role-play scenario. This is the training-scenario module, NOT system
@@ -18,7 +18,8 @@ const scenarioRoleSchema = new Schema(
 const scenarioSchema = new Schema(
   {
     title: { type: String, required: true, trim: true },
-    courseType: { type: String, enum: [...COURSE_TYPES], required: true },
+    // Content scope, not a person's course — a scenario may serve "both".
+    courseType: { type: String, enum: [...COURSE_SCOPES], required: true },
     description: { type: String, default: "" },
     context: { type: String, default: "" },
     roles: { type: [scenarioRoleSchema], default: [] },

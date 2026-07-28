@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { requireScope } from "@/lib/auth/require-scope";
 import { getTrainee } from "@/lib/data/trainees";
 import {
   createAttachment,
@@ -7,6 +7,7 @@ import {
   listAttachments,
   MAX_ATTACHMENT_BYTES,
 } from "@/lib/data/attachments";
+import { parseTraineeFile } from "@/lib/import/parse-trainee-file";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,16 +17,17 @@ const MAX_TOTAL_BYTES = MAX_ATTACHMENT_BYTES * MAX_FILES_PER_REQUEST; // 50MB
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-// GET /api/trainees/[id]/attachments — list metadata for the current user's trainee.
+// GET /api/trainees/[id]/attachments — metadata for a trainee in the caller's scope.
 export async function GET(_request: Request, { params }: RouteContext) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "נדרשת התחברות." }, { status: 401 });
+  const auth = await requireScope();
+  if (!auth.ok) return auth.response;
   const { id } = await params;
+
   try {
-    if (!(await getTrainee(id, user.id))) {
+    if (!(await getTrainee(id, auth.scope))) {
       return NextResponse.json({ error: "החניך לא נמצא." }, { status: 404 });
     }
-    const attachments = await listAttachments(id, user.id);
+    const attachments = await listAttachments(id, auth.scope);
     return NextResponse.json({ attachments });
   } catch (error) {
     console.error("[api/attachments] GET failed:", error);
@@ -35,8 +37,8 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
 // POST /api/trainees/[id]/attachments — upload one or more files (multipart form).
 export async function POST(request: Request, { params }: RouteContext) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "נדרשת התחברות." }, { status: 401 });
+  const auth = await requireScope();
+  if (!auth.ok) return auth.response;
   const { id } = await params;
 
   try {
@@ -46,7 +48,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "הבקשה גדולה מדי." }, { status: 413 });
     }
 
-    if (!(await getTrainee(id, user.id))) {
+    if (!(await getTrainee(id, auth.scope))) {
       return NextResponse.json({ error: "החניך לא נמצא." }, { status: 404 });
     }
 
@@ -89,11 +91,17 @@ export async function POST(request: Request, { params }: RouteContext) {
     const created = [];
     for (const file of files) {
       const content = Buffer.from(await file.arrayBuffer());
-      const att = await createAttachment(id, user.id, {
+      // Pull out plain text where the format allows it (txt/md/csv/json), so
+      // documents on file are already usable by the future bot. Empty for
+      // formats we do not parse; never fatal.
+      const { extractedText } = parseTraineeFile(content, file.type, file.name);
+      // ownerId + courseType are taken from the session scope, not the request.
+      const att = await createAttachment(id, auth.scope, {
         originalName: file.name || "קובץ",
         mimeType: file.type || "application/octet-stream",
         size: file.size,
         content,
+        extractedText,
       });
       if (!att) return NextResponse.json({ error: "החניך לא נמצא." }, { status: 404 });
       created.push(att);

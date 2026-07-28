@@ -5,12 +5,18 @@ import { Paperclip, Send, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui";
 import { UserMenu } from "@/components/layout/UserMenu";
+import { SettingsButton } from "@/components/layout/SettingsButton";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { TraineeCombobox } from "@/components/assistant/TraineeCombobox";
-import { ChatModePills, DEFAULT_CHAT_MODE, type ChatMode } from "@/components/assistant/ChatModePills";
 import type { TraineeDTO } from "@/lib/data/trainees";
 
+/**
+ * General-purpose greeting: the bot no longer asks the user to pick a focus area
+ * up front (the five mode pills are gone). The user simply writes what they need,
+ * and the future AI layer infers the intent from the message itself.
+ */
 const OPENING_MESSAGE =
-  "שלום, אני בוט חניכה ומשוב. אפשר להתייעץ איתי על שיחת חניכה, משוב, סימולציה, שיעור, תרגול מסכם או נע״ת. אפשר לקשר חניך לשיחה, ואפשר גם להתייעץ בלי חניך.";
+  "שלום, אני בוט חניכה ומשוב. אפשר לכתוב לי בחופשיות מה נדרש — התייעצות, ניסוח משוב, ניתוח אירוע או הכנה לשיחה. אפשר לקשר חניך לשיחה, ואפשר גם להתייעץ בלי חניך.";
 
 /** Max composer height before it scrolls internally (a few lines tall). */
 const MAX_COMPOSER_HEIGHT = 200;
@@ -26,9 +32,11 @@ type AssistantChatProps = {
 };
 
 export function AssistantChat({ trainees, initialTraineeId = "", username }: AssistantChatProps) {
+  // `trainees` is already owner+course scoped server-side, so an id from the URL
+  // that is not in this list (someone else's trainee, or the other course's) is
+  // silently dropped rather than linked.
   const validInitial = trainees.some((t) => t.id === initialTraineeId) ? initialTraineeId : "";
   const [traineeId, setTraineeId] = useState(validInitial);
-  const [mode, setMode] = useState<ChatMode>(DEFAULT_CHAT_MODE);
   const [messages, setMessages] = useState<ChatMessage[]>([{ role: "bot", text: OPENING_MESSAGE }]);
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -88,39 +96,35 @@ export function AssistantChat({ trainees, initialTraineeId = "", username }: Ass
       {/* Accessible page heading — kept visually hidden so the chat has no big title bar. */}
       <h1 className="sr-only">בוט חניכה ומשוב</h1>
 
-      {/* Single work bar: conversation mode (centered) + linked trainee (side) */}
-      {/* pt-14 on mobile clears the fixed floating nav button so it never sits over the pills. */}
+      {/* Single work bar. inline-start (right): notifications + user card. inline-end
+          (left): the linked-trainee selector with the settings gear pinned at the very
+          edge (§6/§7). pt-14 on mobile clears the fixed floating nav button. */}
       <div className="shrink-0 border-b border-line bg-surface px-4 pb-4 pt-14 sm:px-6 lg:pt-4">
-        {/* Single row only forms at ≥1360px, where the user box (with username),
-            the centered pills and the linked-trainee block all fit beside the
-            256px sidebar. Below that it stacks (no overlap). */}
-        <div className="flex flex-col items-center gap-3 min-[1360px]:grid min-[1360px]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] min-[1360px]:items-center min-[1360px]:gap-4">
-          {/* User box — hugs the top-right (inline-start) edge. */}
-          <div className="flex justify-center min-[1360px]:justify-self-start">
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          {/* Notifications + user card — hug the inline-start (right, in RTL) edge. */}
+          <div className="flex items-center justify-center gap-2 sm:justify-start">
+            <NotificationBell />
             <UserMenu username={username} />
           </div>
-          {/* Mode pills — auto-width center track (never wrap). Nudged toward the
-              sidebar so the wider linked-trainee block on the left gets enough
-              room (it is wider than the user box on the right). */}
-          <div className="flex justify-center min-[1360px]:translate-x-[2rem]">
-            <ChatModePills value={mode} onChange={setMode} />
-          </div>
-          {/* Linked trainee — pinned to the left edge (inline-end). */}
-          <div className="flex w-full items-center gap-2 min-[1360px]:w-auto min-[1360px]:justify-self-end">
-            <label
-              htmlFor="bot-trainee"
-              className="shrink-0 whitespace-nowrap text-xs font-medium text-muted"
-            >
-              חניך מקושר
-            </label>
-            <div className="min-w-0 flex-1 min-[1360px]:w-48 min-[1360px]:flex-none">
-              <TraineeCombobox
-                id="bot-trainee"
-                trainees={trainees}
-                value={traineeId}
-                onChange={setTraineeId}
-              />
+          {/* Linked trainee (shrinks if tight) + settings gear pinned at the inline-end. */}
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+              <label
+                htmlFor="bot-trainee"
+                className="shrink-0 whitespace-nowrap text-xs font-medium text-muted"
+              >
+                חניך מקושר
+              </label>
+              <div className="min-w-0 flex-1 sm:w-56 sm:flex-none">
+                <TraineeCombobox
+                  id="bot-trainee"
+                  trainees={trainees}
+                  value={traineeId}
+                  onChange={setTraineeId}
+                />
+              </div>
             </div>
+            <SettingsButton />
           </div>
         </div>
       </div>

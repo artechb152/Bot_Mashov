@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { deleteTrainee, getTrainee, updateTrainee } from "@/lib/data/trainees";
+import { deleteTrainee, readTraineeById, updateTraineeById } from "@/lib/data/trainees";
 import { parseTraineeBody } from "@/lib/validation/trainee";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { requireScope } from "@/lib/auth/require-scope";
+import { requireTraineeAccess } from "@/lib/auth/access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -9,16 +10,22 @@ export const runtime = "nodejs";
 // In Next.js 15 the dynamic route context `params` is a Promise and must be awaited.
 type RouteContext = { params: Promise<{ id: string }> };
 
-// GET /api/trainees/[id] — only if it belongs to the current user.
+/**
+ * Read + write go through `requireTraineeAccess` — the unified gate that allows an
+ * OWNER, an active view/edit GRANT holder, a course admin, or a super-admin, and
+ * enforces the cohort lock. An unauthorized id returns 404 (indistinguishable from
+ * missing), so the endpoint cannot probe for others' data. DELETE stays owner-only.
+ */
+
+// GET /api/trainees/[id]
 export async function GET(_request: Request, { params }: RouteContext) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "נדרשת התחברות." }, { status: 401 });
   const { id } = await params;
+  const access = await requireTraineeAccess(id);
+  if (!access.ok) return access.response;
+
   try {
-    const trainee = await getTrainee(id, user.id);
-    if (!trainee) {
-      return NextResponse.json({ error: "החניך לא נמצא." }, { status: 404 });
-    }
+    const trainee = await readTraineeById(id);
+    if (!trainee) return NextResponse.json({ error: "החניך לא נמצא." }, { status: 404 });
     return NextResponse.json({ trainee });
   } catch (error) {
     console.error("[api/trainees/:id] GET failed:", error);
@@ -26,11 +33,11 @@ export async function GET(_request: Request, { params }: RouteContext) {
   }
 }
 
-// PATCH /api/trainees/[id] — only if it belongs to the current user.
+// PATCH /api/trainees/[id] — owner or an active EDIT grant (or admin/super).
 export async function PATCH(request: Request, { params }: RouteContext) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "נדרשת התחברות." }, { status: 401 });
   const { id } = await params;
+  const access = await requireTraineeAccess(id, { write: true });
+  if (!access.ok) return access.response;
 
   let body: unknown;
   try {
@@ -45,10 +52,8 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   }
 
   try {
-    const trainee = await updateTrainee(id, parsed.data, user.id);
-    if (!trainee) {
-      return NextResponse.json({ error: "החניך לא נמצא." }, { status: 404 });
-    }
+    const trainee = await updateTraineeById(id, parsed.data, access.actorId);
+    if (!trainee) return NextResponse.json({ error: "החניך לא נמצא." }, { status: 404 });
     console.log(`[api/trainees/:id] updated ${id} → 200`);
     return NextResponse.json({ trainee });
   } catch (error) {
@@ -57,13 +62,14 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   }
 }
 
-// DELETE /api/trainees/[id] — only if it belongs to the current user.
+// DELETE /api/trainees/[id]
 export async function DELETE(_request: Request, { params }: RouteContext) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "נדרשת התחברות." }, { status: 401 });
+  const auth = await requireScope();
+  if (!auth.ok) return auth.response;
   const { id } = await params;
+
   try {
-    const deleted = await deleteTrainee(id, user.id);
+    const deleted = await deleteTrainee(id, auth.scope);
     if (!deleted) {
       return NextResponse.json({ error: "החניך לא נמצא." }, { status: 404 });
     }

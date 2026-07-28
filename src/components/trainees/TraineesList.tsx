@@ -14,14 +14,16 @@ import {
   THead,
   TR,
 } from "@/components/ui";
+import { ImportTraineeDialog } from "@/components/trainees/ImportTraineeDialog";
 import type { TraineeDTO } from "@/lib/data/trainees";
 
 export function TraineesList({ trainees }: { trainees: TraineeDTO[] }) {
   const [query, setQuery] = useState("");
-  const q = query.trim();
+  const q = query.trim().toLowerCase();
 
+  // Case-insensitive, matching the linked-trainee combobox on the bot page.
   const filtered = useMemo(
-    () => (q ? trainees.filter((t) => t.fullName.includes(q)) : trainees),
+    () => (q ? trainees.filter((t) => t.fullName.toLowerCase().includes(q)) : trainees),
     [trainees, q],
   );
 
@@ -30,12 +32,15 @@ export function TraineesList({ trainees }: { trainees: TraineeDTO[] }) {
       <EmptyState
         icon={Users}
         title="אין עדיין חניכים"
-        description="הוסיפו את החניך הראשון כדי להתחיל בניהול החניכים."
+        description="הוסיפו את החניך הראשון כדי להתחיל בניהול החניכים — ידנית או מתוך קובץ."
         action={
-          <Link href="/trainees/new" className={buttonClasses()}>
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            הוספת חניך
-          </Link>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link href="/trainees/new" className={buttonClasses()}>
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              הוספת חניך
+            </Link>
+            <ImportTraineeDialog />
+          </div>
         }
       />
     );
@@ -58,10 +63,13 @@ export function TraineesList({ trainees }: { trainees: TraineeDTO[] }) {
             className="pe-9"
           />
         </div>
-        <Link href="/trainees/new" className={buttonClasses()}>
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          הוספת חניך
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/trainees/new" className={buttonClasses()}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            הוספת חניך
+          </Link>
+          <ImportTraineeDialog />
+        </div>
       </div>
 
       {filtered.length === 0 ? (

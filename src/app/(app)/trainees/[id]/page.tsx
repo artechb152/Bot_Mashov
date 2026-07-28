@@ -1,22 +1,23 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { ArrowRight, Bot } from "lucide-react";
+import { notFound } from "next/navigation";
+import { Bot } from "lucide-react";
 import { buttonClasses, PageHeader, Panel } from "@/components/ui";
+import { SmartBackButton } from "@/components/layout/SmartBackButton";
 import { DeleteTraineeButton } from "@/components/trainees/DeleteTraineeButton";
 import { TraineeAttachments } from "@/components/trainees/TraineeAttachments";
-import { getTrainee } from "@/lib/data/trainees";
-import { listAttachments } from "@/lib/data/attachments";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { readTraineeById } from "@/lib/data/trainees";
+import { readAttachmentsById } from "@/lib/data/attachments";
+import { requireTraineeAccess } from "@/lib/auth/access";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = { params: Promise<{ id: string }> };
 
 export async function generateMetadata({ params }: PageProps) {
-  const user = await getCurrentUser();
-  if (!user) return { title: "חניך" };
   const { id } = await params;
-  const trainee = await getTrainee(id, user.id).catch(() => null);
+  const access = await requireTraineeAccess(id).catch(() => null);
+  if (!access || !access.ok) return { title: "חניך" };
+  const trainee = await readTraineeById(id).catch(() => null);
   return { title: trainee ? trainee.fullName : "חניך" };
 }
 
@@ -34,22 +35,31 @@ function ItemList({ items, emptyText }: { items: string[]; emptyText: string }) 
 }
 
 export default async function TraineeProfilePage({ params }: PageProps) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
   const { id } = await params;
-  const trainee = await getTrainee(id, user.id);
+  // Unified gate: owner, active view/edit grant, course admin, or super-admin. A
+  // non-authorized id 404s (indistinguishable from missing). Access LEVEL is derived
+  // SERVER-SIDE (owner | view | edit | course_admin | super_admin) — never trusted
+  // from the client — and drives which controls are shown.
+  const access = await requireTraineeAccess(id);
+  if (!access.ok) notFound();
+  const level = access.via;
+  const isOwner = level === "owner";
+  // Who may open the edit form: anyone but a pure view-grant holder.
+  const canEdit = level !== "view";
+  // Document management (upload / delete) on the staff page stays OWNER-only. Edit
+  // grants can edit trainee fields but do NOT gain document upload/delete here (the
+  // staff document routes are owner-scoped); admins manage documents on /admin pages.
+  const canManageDocs = isOwner;
+  const trainee = await readTraineeById(id);
   if (!trainee) notFound();
-  const attachments = await listAttachments(trainee.id, user.id);
+  const attachments = await readAttachmentsById(trainee.id);
 
   const meta = trainee.team ? `צוות ${trainee.team}` : "";
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
-        <Link href="/trainees" className={buttonClasses({ variant: "secondary", size: "sm" })}>
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          חזרה לרשימת החניכים
-        </Link>
+        <SmartBackButton fallbackHref="/trainees" label="חזרה לרשימת החניכים" />
       </div>
 
       <PageHeader
@@ -61,13 +71,13 @@ export default async function TraineeProfilePage({ params }: PageProps) {
               <Bot className="h-4 w-4" aria-hidden="true" />
               פתיחת בוט עם חניך זה
             </Link>
-            <Link
-              href={`/trainees/${trainee.id}/edit`}
-              className={buttonClasses({ variant: "secondary" })}
-            >
-              עריכה
-            </Link>
-            <DeleteTraineeButton id={trainee.id} name={trainee.fullName} />
+            {canEdit ? (
+              <Link href={`/trainees/${trainee.id}/edit`} className={buttonClasses({ variant: "secondary" })}>
+                עריכה
+              </Link>
+            ) : null}
+            {isOwner ? <DeleteTraineeButton id={trainee.id} name={trainee.fullName} /> : null}
+            {level === "view" ? <span className="text-xs text-muted">גישת צפייה</span> : null}
           </>
         }
       />
@@ -92,7 +102,7 @@ export default async function TraineeProfilePage({ params }: PageProps) {
         )}
       </Panel>
 
-      <TraineeAttachments traineeId={trainee.id} initial={attachments} />
+      <TraineeAttachments traineeId={trainee.id} initial={attachments} canUpload={canManageDocs} canDelete={canManageDocs} />
     </div>
   );
 }

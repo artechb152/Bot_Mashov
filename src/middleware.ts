@@ -29,8 +29,35 @@ export const config = {
     "/assistant/:path*",
     "/trainees",
     "/trainees/:path*",
+    // The one-time course picker: needs a session, but NOT a course (that is the
+    // whole point of it), so it is guarded here rather than by the (app) layout.
+    "/select-course",
+    "/api/auth/course",
     // Covers the trainee APIs AND the nested attachment APIs
     // (/api/trainees/[id]/attachments/...).
     "/api/trainees/:path*",
+    // Management + collaboration areas — SESSION-PRESENCE check only. Role/status
+    // can't be verified on the edge (no DB), so the real gates are the layouts +
+    // require*() on every handler; this just closes the "unmatched route" gap.
+    "/admin",
+    "/admin/:path*",
+    "/api/admin/:path*",
+    "/system",
+    "/system/:path*",
+    "/api/system/:path*",
+    "/settings/:path*",
+    "/api/settings/:path*",
+    "/directory",
+    "/directory/:path*",
+    "/messages",
+    "/messages/:path*",
+    "/requests",
+    "/requests/:path*",
+    "/notifications",
+    "/notifications/:path*",
+    "/api/directory/:path*",
+    "/api/messages/:path*",
+    "/api/requests/:path*",
+    "/api/notifications/:path*",
   ],
 };

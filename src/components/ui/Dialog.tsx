@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -22,10 +23,16 @@ export type DialogProps = {
 /**
  * Minimal accessible modal: Escape to close, backdrop click to dismiss, body
  * scroll lock while open, `role="dialog"` + `aria-modal`, initial focus on the
- * panel. Rendered only when `open` is true.
+ * panel. Rendered only when `open` is true, via a React portal to `document.body`
+ * so it can never be clipped or mis-positioned by an ancestor's overflow/transform
+ * (§16) — the persistent shell uses `overflow-hidden`/`backdrop-blur` wrappers.
  */
 export function Dialog({ open, onClose, title, ariaLabel, children, className }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Portals need document.body — only available after mount (avoids SSR mismatch).
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (!open) return;
@@ -77,10 +84,10 @@ export function Dialog({ open, onClose, title, ariaLabel, children, className }:
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
       <div className="absolute inset-0 bg-slate-950/50" onClick={onClose} aria-hidden="true" />
       <div
         ref={panelRef}
@@ -108,6 +115,7 @@ export function Dialog({ open, onClose, title, ariaLabel, children, className }:
         ) : null}
         <div className="px-5 py-4">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

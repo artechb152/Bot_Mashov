@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { SessionUser } from "@/lib/auth/session";
+import type { RootProfile, UserRole } from "@/lib/domain/types";
+import { DirectoryFlyout } from "@/components/directory/DirectoryFlyout";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 
@@ -21,18 +23,35 @@ import { Topbar } from "./Topbar";
 export function AppShell({
   children,
   user,
+  role,
+  rootProfile,
 }: {
   children: React.ReactNode;
   user: SessionUser;
+  /** The current user's role — controls the single nav tree. */
+  role?: UserRole;
+  /** Protected-root profile — drives the crown + platform-owner nav variant. */
+  rootProfile?: RootProfile | null;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [directoryOpen, setDirectoryOpen] = useState(false);
   const pathname = usePathname();
   const isChat = pathname === "/assistant";
+  const openDirectory = () => setDirectoryOpen(true);
 
   return (
     <div className={cn("lg:flex", isChat ? "h-dvh overflow-hidden" : "min-h-screen")}>
+      {/* People directory flyout (opened from the sidebar "אנשי המערכת" item) */}
+      <DirectoryFlyout open={directoryOpen} onClose={() => setDirectoryOpen(false)} />
+
       {/* Desktop rail */}
-      <Sidebar className="sticky top-0 hidden h-screen self-start lg:block" />
+      <Sidebar
+        courseType={user.courseType}
+        role={role}
+        rootProfile={rootProfile}
+        onOpenDirectory={openDirectory}
+        className="sticky top-0 hidden h-screen self-start lg:block"
+      />
 
       {/* Mobile drawer + backdrop */}
       <div
@@ -44,6 +63,10 @@ export function AppShell({
         aria-hidden="true"
       />
       <Sidebar
+        courseType={user.courseType}
+        role={role}
+        rootProfile={rootProfile}
+        onOpenDirectory={openDirectory}
         onNavigate={() => setMobileOpen(false)}
         className={cn(
           "fixed inset-y-0 start-0 z-50 shadow-xl transition-transform duration-200 lg:hidden",

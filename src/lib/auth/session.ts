@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
+import { isCourseType, type CourseType } from "@/lib/domain/types";
 
 /**
  * Stateless auth session: a short user identity signed into a JWT (HS256) and
@@ -10,7 +11,18 @@ import { SignJWT, jwtVerify } from "jose";
 export const SESSION_COOKIE_NAME = "matzpen_session";
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
-export type SessionUser = { id: string; username: string };
+/**
+ * `courseType` is nullable on purpose: a session minted before courses existed —
+ * or one belonging to a legacy user who never chose — simply carries none. Those
+ * users are routed once through /select-course, which re-signs the cookie. Every
+ * course-scoped query therefore requires a NON-null course, so a course-less
+ * session can never read course-scoped data.
+ */
+export type SessionUser = {
+  id: string;
+  username: string;
+  courseType: CourseType | null;
+};
 
 function getSecretKey(): Uint8Array {
   const secret = process.env.SESSION_SECRET;
@@ -22,7 +34,7 @@ function getSecretKey(): Uint8Array {
 
 /** Sign a session token for the given user. */
 export async function signSession(user: SessionUser): Promise<string> {
-  return new SignJWT({ username: user.username })
+  return new SignJWT({ username: user.username, courseType: user.courseType ?? null })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setIssuedAt()
@@ -37,7 +49,10 @@ export async function verifySession(token: string): Promise<SessionUser | null> 
     const id = typeof payload.sub === "string" ? payload.sub : "";
     const username = typeof payload.username === "string" ? payload.username : "";
     if (!id || !username) return null;
-    return { id, username };
+    // Tokens minted before courses existed have no `courseType` claim, and a
+    // claim that is not a known course is treated as absent rather than trusted.
+    const courseType = isCourseType(payload.courseType) ? payload.courseType : null;
+    return { id, username, courseType };
   } catch {
     return null;
   }

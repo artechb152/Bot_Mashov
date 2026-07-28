@@ -23,9 +23,22 @@ function formatDate(iso: string | null): string {
 export function TraineeAttachments({
   traineeId,
   initial,
+  apiBase = "/api/trainees",
+  canUpload = true,
+  canDelete = true,
 }: {
   traineeId: string;
   initial: AttachmentDTO[];
+  /** API root: "/api/trainees" (staff) or "/api/admin/trainees" (admin). */
+  apiBase?: string;
+  /** Hides the upload control (e.g. admin view, or a view/edit-grant staff viewer). */
+  canUpload?: boolean;
+  /**
+   * Hides the per-document delete control. Owners and scoped admins may delete;
+   * grant-based viewers/editors may NOT delete documents (default true preserves
+   * the existing admin/owner behavior; the staff page passes owner-only).
+   */
+  canDelete?: boolean;
 }) {
   const [items, setItems] = useState<AttachmentDTO[]>(initial);
   const [uploading, setUploading] = useState(false);
@@ -42,7 +55,7 @@ export function TraineeAttachments({
     try {
       const fd = new FormData();
       picked.forEach((f) => fd.append("files", f));
-      const res = await fetch(`/api/trainees/${traineeId}/attachments`, {
+      const res = await fetch(`${apiBase}/${traineeId}/attachments`, {
         method: "POST",
         body: fd,
       });
@@ -66,7 +79,7 @@ export function TraineeAttachments({
   async function handleDelete(att: AttachmentDTO) {
     setError(null);
     try {
-      const res = await fetch(`/api/trainees/${traineeId}/attachments/${att.id}`, {
+      const res = await fetch(`${apiBase}/${traineeId}/attachments/${att.id}`, {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -83,25 +96,29 @@ export function TraineeAttachments({
     <Panel>
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-ink">מסמכים מצורפים</h3>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className="hidden"
-          aria-hidden="true"
-          tabIndex={-1}
-          onChange={handleFiles}
-        />
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-        >
-          <Paperclip className="h-4 w-4" aria-hidden="true" />
-          {uploading ? "מעלה…" : "העלאת קבצים"}
-        </Button>
+        {canUpload ? (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              aria-hidden="true"
+              tabIndex={-1}
+              onChange={handleFiles}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              <Paperclip className="h-4 w-4" aria-hidden="true" />
+              {uploading ? "מעלה…" : "העלאת קבצים"}
+            </Button>
+          </>
+        ) : null}
       </div>
 
       {error ? (
@@ -115,7 +132,9 @@ export function TraineeAttachments({
 
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-muted">
-          אין עדיין מסמכים. ניתן לצרף מסמכי משוב, הערות או קבצים רלוונטיים (עד 5MB לקובץ).
+          {canUpload
+            ? "אין עדיין מסמכים. ניתן לצרף מסמכי משוב, הערות או קבצים רלוונטיים (עד 5MB לקובץ)."
+            : "אין מסמכים מצורפים לחניך זה."}
         </p>
       ) : (
         <ul className="mt-3 space-y-2">
@@ -133,20 +152,22 @@ export function TraineeAttachments({
                 </p>
               </div>
               <a
-                href={`/api/trainees/${traineeId}/attachments/${att.id}`}
+                href={`${apiBase}/${traineeId}/attachments/${att.id}`}
                 className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-subtle transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15"
                 aria-label={`הורדת ${att.originalName}`}
               >
                 <Download className="h-4 w-4" aria-hidden="true" />
               </a>
-              <button
-                type="button"
-                onClick={() => handleDelete(att)}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-subtle transition-colors hover:bg-red-50 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15"
-                aria-label={`מחיקת ${att.originalName}`}
-              >
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-              </button>
+              {canDelete ? (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(att)}
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-subtle transition-colors hover:bg-red-50 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15"
+                  aria-label={`מחיקת ${att.originalName}`}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>
