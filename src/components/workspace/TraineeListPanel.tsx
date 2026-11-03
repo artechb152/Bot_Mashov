@@ -181,9 +181,7 @@ function ExpandedFeedback() {
       <div className="border-t border-line pt-3">
         <p className="mb-2 text-xs font-semibold text-muted">הוספת משוב</p>
         <FeedbackComposer
-          onSubmit={async (input) => {
-            await addFeedback(input);
-          }}
+          onSubmit={(input) => addFeedback(input)}
           submitting={loading.feedback}
           focusSignal={composerFocusSignal}
         />
