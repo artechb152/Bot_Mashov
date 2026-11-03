@@ -30,7 +30,7 @@ export function FeedbackComposer({
   focusSignal = 0,
   className,
 }: {
-  onSubmit: (input: FeedbackComposerInput) => void | Promise<void>;
+  onSubmit: (input: FeedbackComposerInput) => boolean | Promise<boolean>;
   submitting?: boolean;
   error?: string | null;
   /** Increment to move keyboard focus into the title field. */
@@ -74,14 +74,21 @@ export function FeedbackComposer({
       setLocalError("יש לבחור קובץ.");
       return;
     }
-    await onSubmit({
-      feedbackType,
-      title: title.trim(),
-      rawText: rawText.trim(),
-      selectedAction: selectedAction.trim(),
-      file: mode === "file" ? file : null,
-    });
-    reset();
+    try {
+      const saved = await onSubmit({
+        feedbackType,
+        title: title.trim(),
+        rawText: rawText.trim(),
+        selectedAction: selectedAction.trim(),
+        file: mode === "file" ? file : null,
+      });
+      // Keep the user's draft (including the selected file) if the server rejected
+      // the save. A failed mutation reports its error in the workspace banner.
+      if (saved) reset();
+    } catch {
+      // Also protect against callbacks that unexpectedly reject.
+      setLocalError("שמירת המשוב נכשלה. התוכן נשמר בטופס — נסו שוב.");
+    }
   }
 
   const shownError = error ?? localError;
