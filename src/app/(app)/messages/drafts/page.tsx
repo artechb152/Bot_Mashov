@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DraftsPage() {
   const account = await getAccount();
-  if (!account) redirect("/login");
+  if (!account) redirect("/");
   const drafts = await listDrafts(account.id);
   return <DraftList drafts={drafts} />;
 }

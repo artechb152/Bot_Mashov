@@ -1,114 +1,92 @@
-import {
-  Bot,
-  BookOpen,
-  ClipboardList,
-  Contact,
-  FileClock,
-  Inbox,
-  KeyRound,
-  Layers,
-  LayoutDashboard,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
 import type { RootProfile, UserRole } from "@/lib/domain/types";
+
+/**
+ * A serializable icon identifier. NavItems intentionally carry a string `iconKey`
+ * (NOT a React component) so a Server Component can pass them to a Client Component
+ * (e.g. AreaNav) without violating the "only plain objects" boundary rule. The client
+ * maps `iconKey` → a Lucide component locally.
+ */
+export type NavIconKey =
+  | "dashboard"
+  | "users"
+  | "trainees"
+  | "cohorts"
+  | "access"
+  | "courses"
+  | "logs"
+  | "directory"
+  | "messages";
 
 export type NavItem = {
   /** Hebrew label shown in the navigation. */
   label: string;
   /** Route the item links to. */
   href: string;
-  /** Icon rendered beside the label (functional wayfinding, not decoration). */
-  icon: LucideIcon;
+  /** Serializable icon key resolved to a component by the client renderer. */
+  iconKey: NavIconKey;
   /** Short Hebrew description used on each module's header. */
   description: string;
-  /**
-   * Match the active state on an EXACT path only (used for dashboard roots like
-   * `/admin` and `/system`, so they don't light up on every sub-page).
-   */
+  /** Match the active state on an EXACT path only (dashboard roots like /admin). */
   exact?: boolean;
-  /** Render this item pinned at the bottom of the rail (the directory / people link). */
-  footer?: boolean;
-  /** Open a flyout panel instead of navigating (the people directory, §18). */
+  /** Open a flyout panel instead of navigating (the people directory). */
   flyout?: boolean;
 };
 
 /**
- * ONE role-specific navigation tree — the single source of truth for the persistent
- * sidebar (§14). Every authenticated area now lives under the `(app)` route group
- * and shares one shell, so a user sees exactly one tree (no separate staff/admin/
- * system rails). Settings is NOT a nav item — it is reached from the account gear
- * (§15). The people/"אנשי המערכת" link is pinned to the bottom (`footer`).
+ * The work area (/workspace) is the home for every role and lives in the sidebar's
+ * COURSE → COHORT tree, not as a flat nav item. `navForRole` returns only the FOOTER
+ * management links a role may reach (users, cohorts, courses, invites, audit, access
+ * requests), rendered as a horizontal AreaNav inside /admin and /system. The old
+ * primary items (bot, internal messages, dashboards-as-nav, knowledge) are gone.
  */
 
-const BOT: NavItem = {
-  label: "בוט חניכה ומשוב",
-  href: "/assistant",
-  icon: Bot,
-  description: "בוט חניכה ומשוב — התייעצות, ניסוח משוב וניתוח אירוע.",
-};
-
-// One "הודעות ובקשות" area (§25): mail + requests live together; requests are
-// reached from the messages sub-nav, not a separate sidebar link.
-const MESSAGES: NavItem = {
-  label: "הודעות ובקשות",
-  href: "/messages",
-  icon: Inbox,
-  description: "תיבת הדואר הפנימית ובקשות גישה ושינוי.",
-};
-
-const DIRECTORY: NavItem = {
+/** People directory — opens a flyout (not a route) where wired; a link elsewhere. */
+export const DIRECTORY_ITEM: NavItem = {
   label: "אנשי המערכת",
   href: "/directory",
-  icon: Contact,
+  iconKey: "directory",
   description: "אנשי המערכת — סגל, מנהלים והנהלת המערכת.",
-  footer: true,
   flyout: true,
 };
 
-function staffNav(): NavItem[] {
-  return [
-    BOT,
-    { label: "תיקי החניך שלי", href: "/trainees", icon: Users, description: "ניהול תיקי החניכים שלך." },
-    MESSAGES,
-    DIRECTORY,
-  ];
-}
+/** System notifications / updates (NOT the old person-to-person messaging). */
+export const NOTIFICATIONS_ITEM: NavItem = {
+  label: "הודעות מערכת",
+  href: "/notifications",
+  iconKey: "messages",
+  description: "עדכוני מערכת והתראות.",
+};
 
+/**
+ * The management area ("ניהול המערכת") is intentionally minimal. Cohort management
+ * lives in the sidebar; trainees live in /workspace; access requests were removed;
+ * system updates live in the user menu — so none of those appear here.
+ *   - admin (course-bound) → just the course's users.
+ *   - super_admin/root     → users, access codes, courses, and the audit log.
+ */
 function adminNav(): NavItem[] {
   return [
-    { label: "סקירת קורס", href: "/admin", icon: LayoutDashboard, description: "סקירת הקורס.", exact: true },
-    BOT,
-    { label: "משתמשי הקורס", href: "/admin/users", icon: Users, description: "סגל הקורס." },
-    { label: "תיקי חניך", href: "/admin/trainees", icon: ClipboardList, description: "כל תיקי החניך בקורס." },
-    { label: "מחזורים וצוותים", href: "/admin/cohorts", icon: Layers, description: "ניהול מחזורים וצוותים." },
-    MESSAGES,
-    DIRECTORY,
+    { label: "משתמשים", href: "/admin/users", iconKey: "users", description: "ניהול משתמשי הקורס." },
+    { label: "תיקי חניך", href: "/admin/trainees", iconKey: "trainees", description: "כל תיקי החניך בקורס — כלי ניהולי." },
+    { label: "אנשי מערכת", href: "/admin/people", iconKey: "directory", description: "בעלי תפקידי ניהול ומערכת." },
   ];
 }
 
-function superNav(rootProfile: RootProfile | null): NavItem[] {
-  const items: NavItem[] = [
-    { label: "סקירת מערכת", href: "/system", icon: LayoutDashboard, description: "סקירת המערכת.", exact: true },
+function superNav(): NavItem[] {
+  return [
+    { label: "משתמשים", href: "/system/users", iconKey: "users", description: "ניהול כל המשתמשים." },
+    { label: "תיקי חניך", href: "/system/trainees", iconKey: "trainees", description: "כל תיקי החניך במערכת — כלי ניהולי." },
+    { label: "אנשי מערכת", href: "/system/people", iconKey: "directory", description: "בעלי תפקידי ניהול ומערכת." },
+    { label: "קודי גישה", href: "/system/invites", iconKey: "access", description: "יצירת קודי גישה למשתמשים חדשים." },
+    { label: "קורסים", href: "/system/courses", iconKey: "courses", description: "ניהול הקורסים." },
+    { label: "יומן מערכת", href: "/system/audit", iconKey: "logs", description: "יומן הביקורת." },
   ];
-  // The platform-owner root is administration-only — no bot / personal work area (§14).
-  if (rootProfile !== "platform_owner") items.push(BOT);
-  items.push(
-    { label: "ניהול משתמשים", href: "/system/users", icon: Users, description: "ניהול כל המשתמשים." },
-    { label: "כל תיקי החניך", href: "/system/trainees", icon: ClipboardList, description: "כל תיקי החניך במערכת." },
-    { label: "קורסים", href: "/system/courses", icon: BookOpen, description: "ניהול הקורסים." },
-    { label: "מחזורים וצוותים", href: "/system/cohorts", icon: Layers, description: "ניהול מחזורים וצוותים." },
-    { label: "קודי הרשאה", href: "/system/invites", icon: KeyRound, description: "קודי הזמנת מנהלים." },
-    MESSAGES,
-    { label: "יומן פעולות", href: "/system/audit", icon: FileClock, description: "יומן הביקורת." },
-    DIRECTORY,
-  );
-  return items;
 }
 
-/** The single navigation tree for a given role + root profile. */
-export function navForRole(role: UserRole | undefined, rootProfile: RootProfile | null = null): NavItem[] {
-  if (role === "super_admin") return superNav(rootProfile);
+/** The role's MANAGEMENT links, rendered as a horizontal AreaNav in /admin and /system.
+ *  Staff have no management links. Plain serializable data (no React components). */
+export function navForRole(role: UserRole | undefined, _rootProfile: RootProfile | null = null): NavItem[] {
+  if (role === "super_admin") return superNav();
   if (role === "admin") return adminNav();
-  return staffNav();
+  return [];
 }

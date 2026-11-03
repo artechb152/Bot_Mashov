@@ -16,9 +16,9 @@ export const dynamic = "force-dynamic";
  */
 export default async function SelectCoursePage() {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/");
   // Already has a course — nothing to choose.
-  if (user.courseType) redirect("/");
+  if (user.courseType) redirect("/workspace");
 
   return (
     <AuthScreen

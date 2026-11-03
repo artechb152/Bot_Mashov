@@ -3,6 +3,8 @@ import { deleteTrainee, readTraineeById, updateTraineeById } from "@/lib/data/tr
 import { parseTraineeBody } from "@/lib/validation/trainee";
 import { requireScope } from "@/lib/auth/require-scope";
 import { requireTraineeAccess } from "@/lib/auth/access";
+import { isCohortInCourse } from "@/lib/data/cohorts";
+import { isCourseType } from "@/lib/domain/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -46,13 +48,35 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     return NextResponse.json({ error: "גוף הבקשה אינו תקין." }, { status: 400 });
   }
 
+  // A cohort change on its own is a valid update (even with no other fields).
+  const rawCohort = (body as { cohortId?: unknown }).cohortId;
+  const hasCohort = typeof rawCohort === "string";
+
   const parsed = parseTraineeBody(body, true);
   if (!parsed.ok) {
-    return NextResponse.json({ error: parsed.errors.join(" "), errors: parsed.errors }, { status: 400 });
+    const onlyEmpty = parsed.errors.length === 1 && parsed.errors[0] === "לא נשלחו שדות לעדכון.";
+    if (!(hasCohort && onlyEmpty)) {
+      return NextResponse.json({ error: parsed.errors.join(" "), errors: parsed.errors }, { status: 400 });
+    }
+  }
+  const data = parsed.ok ? parsed.data : {};
+
+  // Optional cohort change — validated against the TRAINEE's course. "" clears it.
+  const org: { cohortId?: string | null } = {};
+  if (hasCohort) {
+    if ((rawCohort as string).trim() === "") {
+      org.cohortId = null;
+    } else {
+      const courseType = access.trainee.courseType;
+      if (!isCourseType(courseType) || !(await isCohortInCourse(rawCohort as string, courseType))) {
+        return NextResponse.json({ error: "המחזור שנבחר אינו תקין." }, { status: 400 });
+      }
+      org.cohortId = rawCohort as string;
+    }
   }
 
   try {
-    const trainee = await updateTraineeById(id, parsed.data, access.actorId);
+    const trainee = await updateTraineeById(id, data, access.actorId, org);
     if (!trainee) return NextResponse.json({ error: "החניך לא נמצא." }, { status: 404 });
     console.log(`[api/trainees/:id] updated ${id} → 200`);
     return NextResponse.json({ trainee });

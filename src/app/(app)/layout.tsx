@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { getAccount } from "@/lib/auth/account";
+import { getWorkspaceNav, type WorkspaceNav } from "@/lib/data/workspace-nav";
 
 /**
  * Layout for the "(app)" route group — every section here is wrapped in the
@@ -19,16 +20,29 @@ export default async function AppSectionLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const account = await getAccount();
-  if (!account) redirect("/login");
+  if (!account) redirect("/");
   // Suspended/disabled users are blocked from every protected surface (§4). This is
   // the shared gate for the whole (app) group; area layouts add role checks.
-  if (account.status !== "active") redirect("/login");
+  if (account.status !== "active") redirect("/");
   if (account.role !== "super_admin" && !account.courseType) redirect("/select-course");
+
+  // The sidebar's course → cohort tree. Skipped for the platform-owner root (no
+  // personal work area). Best-effort — a nav hiccup must not blank the whole shell.
+  let nav: WorkspaceNav | null = null;
+  if (account.rootProfile !== "platform_owner") {
+    try {
+      nav = await getWorkspaceNav(account);
+    } catch {
+      nav = null;
+    }
+  }
+
   return (
     <AppShell
       user={{ id: account.id, username: account.username, courseType: account.courseType }}
       role={account.role}
       rootProfile={account.rootProfile}
+      nav={nav}
     >
       {children}
     </AppShell>

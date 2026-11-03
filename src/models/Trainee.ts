@@ -40,6 +40,26 @@ const traineeSchema = new Schema(
     teamId: { type: Schema.Types.ObjectId, ref: "Team" },
     status: { type: String, enum: [...TRAINEE_STATUSES], required: true, default: "active" },
     cohortLocked: { type: Boolean, required: true, default: false },
+
+    // Optional traceability for a trainee created via file import. The trainee record
+    // is the primary datum; this only references the source file. The BINARY is NOT
+    // stored here — it lives in FileStorage under `storageKey` (server-side only, never
+    // exposed to the client). Additive + optional so existing records still validate.
+    sourceImport: {
+      type: new Schema(
+        {
+          originalFileName: { type: String, default: "" },
+          mimeType: { type: String, default: "" },
+          size: { type: Number, default: 0 },
+          storageKey: { type: String, default: "" },
+          extractionStatus: { type: String, default: "" },
+          uploadedBy: { type: Schema.Types.ObjectId, ref: "User" },
+          uploadedAt: { type: Date },
+        },
+        { _id: false },
+      ),
+      required: false,
+    },
   },
   { timestamps: true },
 );

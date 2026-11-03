@@ -11,7 +11,7 @@ type PageProps = { params: Promise<{ id: string }> };
 
 export default async function AdminEditTraineePage({ params }: PageProps) {
   const auth = await requireAdmin();
-  if (!auth.ok) redirect("/login");
+  if (!auth.ok) redirect("/");
   const { id } = await params;
   const trainee = await adminGetTrainee(auth.grant, id);
   if (!trainee) notFound();

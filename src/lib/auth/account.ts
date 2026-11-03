@@ -50,6 +50,8 @@ export type Account = {
   status: UserStatus;
   adminPosition: AdminPosition | null;
   directoryVisibility: DirectoryVisibility;
+  /** Personal work-area preference — the cohort /workspace opens on. Not an authz field. */
+  defaultCohortId: string | null;
 };
 
 type LeanAccount = {
@@ -63,6 +65,7 @@ type LeanAccount = {
   status?: string | null;
   adminPosition?: string | null;
   directoryVisibility?: string | null;
+  defaultCohortId?: unknown;
 };
 
 export const getAccount = cache(async (): Promise<Account | null> => {
@@ -72,7 +75,7 @@ export const getAccount = cache(async (): Promise<Account | null> => {
   await connectToDatabase();
   const doc = await User.findById(session.id)
     .select(
-      "_id username courseType courseId role isRootSuperAdmin rootProfile status adminPosition directoryVisibility",
+      "_id username courseType courseId role isRootSuperAdmin rootProfile status adminPosition directoryVisibility defaultCohortId",
     )
     .lean<LeanAccount | null>();
 
@@ -110,5 +113,6 @@ export const getAccount = cache(async (): Promise<Account | null> => {
       : "visible",
     courseType: isGlobal ? null : isCourseType(doc.courseType) ? doc.courseType : null,
     courseId: isGlobal ? null : doc.courseId ? String(doc.courseId) : null,
+    defaultCohortId: doc.defaultCohortId ? String(doc.defaultCohortId) : null,
   };
 });

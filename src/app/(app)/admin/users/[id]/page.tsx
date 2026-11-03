@@ -28,7 +28,7 @@ function formatDate(iso: string | null): string {
 
 export default async function AdminUserDetailPage({ params }: PageProps) {
   const auth = await requireAdmin();
-  if (!auth.ok) redirect("/login");
+  if (!auth.ok) redirect("/");
   const account = await getAccount();
   const { id } = await params;
 

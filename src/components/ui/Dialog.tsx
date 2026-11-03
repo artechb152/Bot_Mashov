@@ -18,6 +18,8 @@ export type DialogProps = {
   ariaLabel?: string;
   children: React.ReactNode;
   className?: string;
+  /** Extra classes for the backdrop (e.g. a subtle `backdrop-blur-sm`). */
+  backdropClassName?: string;
 };
 
 /**
@@ -27,7 +29,7 @@ export type DialogProps = {
  * so it can never be clipped or mis-positioned by an ancestor's overflow/transform
  * (§16) — the persistent shell uses `overflow-hidden`/`backdrop-blur` wrappers.
  */
-export function Dialog({ open, onClose, title, ariaLabel, children, className }: DialogProps) {
+export function Dialog({ open, onClose, title, ariaLabel, children, className, backdropClassName }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -88,7 +90,7 @@ export function Dialog({ open, onClose, title, ariaLabel, children, className }:
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
-      <div className="absolute inset-0 bg-slate-950/50" onClick={onClose} aria-hidden="true" />
+      <div className={cn("absolute inset-0 bg-slate-950/50", backdropClassName)} onClick={onClose} aria-hidden="true" />
       <div
         ref={panelRef}
         tabIndex={-1}
@@ -96,7 +98,9 @@ export function Dialog({ open, onClose, title, ariaLabel, children, className }:
         aria-modal="true"
         aria-label={title ?? ariaLabel}
         className={cn(
-          "relative z-10 w-full max-w-lg rounded-xl border border-line bg-surface shadow-xl focus:outline-none",
+          // Cap to the viewport and scroll internally so a tall form (e.g. signup)
+          // is never clipped; short modals are unaffected.
+          "relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl border border-line bg-surface shadow-xl focus:outline-none",
           className,
         )}
       >

@@ -1,6 +1,6 @@
 import { isValidObjectId, Types } from "mongoose";
 import { connectToDatabase } from "@/lib/db/mongoose";
-import { Cohort, Course, UserAssignment } from "@/models";
+import { Cohort, Course, User, UserAssignment } from "@/models";
 import { writeAudit } from "@/lib/data/audit";
 import { notifyMany } from "@/lib/data/notifications";
 import { courseTypeForId } from "@/lib/data/courses";
@@ -89,6 +89,17 @@ export async function getCohort(id: string): Promise<CohortDTO | null> {
   return doc ? serializeCohort(doc) : null;
 }
 
+/**
+ * Whether a cohort is a valid assignment target for a given course: it exists, is not
+ * archived, and belongs to that course. Used to validate a client-chosen cohortId on
+ * a trainee create/edit (cohort is a filter, never an authz key — course+owner still
+ * gate access).
+ */
+export async function isCohortInCourse(cohortId: string, courseType: CourseType): Promise<boolean> {
+  const cohort = await getCohort(cohortId);
+  return Boolean(cohort && cohort.status !== "archived" && cohort.courseType === courseType);
+}
+
 export type CreateCohortInput = {
   courseId: string;
   name: string;
@@ -130,6 +141,15 @@ export async function createCohort(actorId: string, input: CreateCohortInput): P
       targetId: cohort.id,
       after: { courseId: cohort.courseId, name: cohort.name, status: cohort.status },
     });
+    // A newly created cohort becomes the CREATOR's personal default (theirs only) —
+    // best-effort, never blocks creation.
+    try {
+      if (isValidObjectId(actorId)) {
+        await User.updateOne({ _id: actorId }, { $set: { defaultCohortId: new Types.ObjectId(cohort.id) } });
+      }
+    } catch (err) {
+      console.error("[cohorts] set creator default failed:", err);
+    }
     return { ok: true, cohort };
   } catch (err) {
     if (err && typeof err === "object" && (err as { code?: number }).code === 11000) {

@@ -6,6 +6,6 @@ export const dynamic = "force-dynamic";
 
 export default async function NewRequestPage() {
   const account = await getAccount();
-  if (!account) redirect("/login");
+  if (!account) redirect("/");
   return <NewRequestForm />;
 }

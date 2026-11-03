@@ -8,7 +8,8 @@ const heebo = Heebo({
   subsets: ["hebrew", "latin"],
   variable: "--font-heebo",
   display: "swap",
-  weight: ["400", "500", "600", "700"],
+  // 800 powers the hero wordmark's font-extrabold (same Heebo family — not a new font).
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {

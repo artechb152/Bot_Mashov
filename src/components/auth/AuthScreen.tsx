@@ -1,9 +1,11 @@
-import { Compass } from "lucide-react";
-import { siteConfig } from "@/lib/config";
+import { BrandWordmark } from "@/components/brand/BrandWordmark";
 
 /**
- * Shared shell for the auth pages: dark-navy full screen (matching the landing),
- * brand mark on top, a clean white panel with the form, and a footer link. RTL.
+ * Shared shell for the auth pages (login / signup / select-course): a deep-navy field
+ * matching the landing, composed as two balanced zones on desktop — the חונך+ brand
+ * (wordmark + slogan) on the inline-start (right, RTL) and the form card on the
+ * inline-end (left). On mobile it collapses to a single centered card with the
+ * wordmark above it. RTL. Auth logic lives entirely in the injected `children`.
  */
 export function AuthScreen({
   title,
@@ -20,22 +22,30 @@ export function AuthScreen({
     <main
       id="main"
       tabIndex={-1}
-      className="relative flex min-h-dvh flex-col items-center justify-center bg-slate-950 px-4 py-12 text-slate-100 focus:outline-none"
+      className="relative flex min-h-dvh items-center justify-center bg-brand-navy-deep px-4 py-12 text-slate-100 focus:outline-none"
     >
-      <div className="mb-8 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-900">
-          <Compass className="h-5 w-5" aria-hidden="true" />
-        </span>
-        <span className="text-lg font-semibold text-white">{siteConfig.name}</span>
-      </div>
+      <div className="grid w-full max-w-5xl items-center gap-10 lg:grid-cols-2 lg:gap-16">
+        {/* Brand zone — inline-start (right). Slogan/description only on desktop. */}
+        <div className="text-center lg:text-start">
+          <BrandWordmark tone="onDark" size="lg" />
+          <p className="mt-5 hidden text-lg font-medium text-slate-100 lg:block">
+            עובדים חכם יותר. חונכים טוב יותר.
+          </p>
+          <p className="mt-2 hidden max-w-sm text-sm leading-relaxed text-slate-300 lg:block">
+            כלי חכם לחניכה, משוב, סיכום ומעקב אחר התקדמות החניכים.
+          </p>
+        </div>
 
-      <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-6 text-ink shadow-2xl sm:p-8">
-        <h1 className="text-xl font-semibold text-ink">{title}</h1>
-        {subtitle ? <p className="mt-1 text-sm text-muted">{subtitle}</p> : null}
-        <div className="mt-6">{children}</div>
+        {/* Form zone — inline-end (left). */}
+        <div className="mx-auto w-full max-w-md lg:mx-0 lg:ms-auto">
+          <div className="rounded-2xl border border-line bg-surface p-6 text-ink shadow-2xl sm:p-8">
+            <h1 className="text-2xl font-semibold text-ink">{title}</h1>
+            {subtitle ? <p className="mt-1.5 text-sm text-muted">{subtitle}</p> : null}
+            <div className="mt-6">{children}</div>
+          </div>
+          <p className="mt-5 text-center text-sm text-slate-400 lg:text-start">{footer}</p>
+        </div>
       </div>
-
-      <p className="mt-6 text-sm text-slate-400">{footer}</p>
     </main>
   );
 }

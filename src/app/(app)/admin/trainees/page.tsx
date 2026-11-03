@@ -7,9 +7,14 @@ import { listAllTrainees, listAllUsers } from "@/lib/data/admin";
 export const metadata = { title: "תיקי חניך" };
 export const dynamic = "force-dynamic";
 
+/**
+ * Management view of trainee files (course-scoped). A system-level tool for viewing /
+ * managing trainees — it does NOT replace /workspace. Lives inside the admin layout so
+ * the AreaNav stays visible.
+ */
 export default async function AdminTraineesPage() {
   const auth = await requireAdmin();
-  if (!auth.ok) redirect("/login");
+  if (!auth.ok) redirect("/");
 
   const [trainees, users] = await Promise.all([listAllTrainees(auth.grant), listAllUsers(auth.grant)]);
   const staff = users

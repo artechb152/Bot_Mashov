@@ -9,8 +9,8 @@ import { MessagesNav } from "@/components/messages/MessagesNav";
  */
 export default async function MessagesLayout({ children }: { children: React.ReactNode }) {
   const account = await getAccount();
-  if (!account) redirect("/login");
-  if (account.status !== "active") redirect("/login");
+  if (!account) redirect("/");
+  if (account.status !== "active") redirect("/");
 
   return (
     <div className="mx-auto max-w-4xl">

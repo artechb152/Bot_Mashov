@@ -50,6 +50,7 @@ function accountFor(u: LeanUser): Account {
     status: (u.status as Account["status"]) ?? "active",
     adminPosition: (u.adminPosition as Account["adminPosition"]) ?? null,
     directoryVisibility: (u.directoryVisibility as Account["directoryVisibility"]) ?? "visible",
+    defaultCohortId: null,
   };
 }
 

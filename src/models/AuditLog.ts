@@ -16,6 +16,7 @@ export const AUDIT_TARGET_TYPES = [
   "team",
   "trainee",
   "document",
+  "feedback",
   "message",
   "request",
   "invite",

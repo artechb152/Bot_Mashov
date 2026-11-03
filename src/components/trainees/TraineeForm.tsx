@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Field, Input, Textarea } from "@/components/ui";
+import { Button, Field, Input, Select, Textarea } from "@/components/ui";
 import { arrayToLines, linesToArray } from "@/lib/text";
 import type { TraineeDTO } from "@/lib/data/trainees";
+
+type CohortOption = { id: string; name: string };
 
 type TraineeFormProps = {
   mode: "create" | "edit";
@@ -32,9 +34,27 @@ export function TraineeForm({
   const [strengthsText, setStrengthsText] = useState(arrayToLines(initial?.strengths));
   const [weaknessesText, setWeaknessesText] = useState(arrayToLines(initial?.weaknesses));
   const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [cohortId, setCohortId] = useState(initial?.cohortId ?? "");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Cohort assignment is offered on the staff path (the /workspace-centric flow).
+  const supportsCohort = apiBase === "/api/trainees";
+  const [cohorts, setCohorts] = useState<CohortOption[]>([]);
+  useEffect(() => {
+    if (!supportsCohort) return;
+    let active = true;
+    fetch("/api/cohorts")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { cohorts?: CohortOption[] } | null) => {
+        if (active && d?.cohorts) setCohorts(d.cohorts);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [supportsCohort]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,13 +65,15 @@ export function TraineeForm({
       return;
     }
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       fullName: fullName.trim(),
       team: team.trim(),
       strengths: linesToArray(strengthsText),
       weaknesses: linesToArray(weaknessesText),
       notes: notes.trim(),
     };
+    // "" → "ללא שיוך למחזור" (explicitly unassigned); a real id assigns the cohort.
+    if (supportsCohort) payload.cohortId = cohortId;
 
     setSubmitting(true);
     // Set once we start a full-page navigation, so `finally` keeps the button
@@ -111,6 +133,19 @@ export function TraineeForm({
       <Field label="צוות" htmlFor="team" hint="לא חובה">
         <Input id="team" value={team} onChange={(e) => setTeam(e.target.value)} autoComplete="off" />
       </Field>
+
+      {supportsCohort ? (
+        <Field label="מחזור" htmlFor="cohortId" hint="לשיוך החניך למחזור בקורס">
+          <Select id="cohortId" value={cohortId} onChange={(e) => setCohortId(e.target.value)} disabled={submitting}>
+            <option value="">ללא שיוך למחזור</option>
+            {cohorts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      ) : null}
 
       <Field label="חוזקות" htmlFor="strengths" hint="שורה לכל פריט">
         <Textarea

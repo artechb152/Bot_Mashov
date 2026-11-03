@@ -3,6 +3,7 @@ import { createTrainee, listTrainees, type TraineeInput } from "@/lib/data/train
 import { parseTraineeBody } from "@/lib/validation/trainee";
 import { requireScope } from "@/lib/auth/require-scope";
 import { getCurrentAssignment } from "@/lib/data/assignments";
+import { isCohortInCourse } from "@/lib/data/cohorts";
 
 // Always run on-demand against the database (never statically cached / prerendered).
 export const dynamic = "force-dynamic";
@@ -42,12 +43,27 @@ export async function POST(request: Request) {
     );
   }
 
+  // Optional client-chosen cohort — must belong to the user's course (else 400).
+  // "" clears it ("ללא שיוך למחזור"); omitted → fall back to the assignment cohort.
+  const rawCohort = (body as { cohortId?: unknown }).cohortId;
+  let chosenCohortId: string | null | undefined;
+  if (typeof rawCohort === "string") {
+    if (rawCohort.trim() === "") {
+      chosenCohortId = null;
+    } else if (await isCohortInCourse(rawCohort, auth.scope.courseType)) {
+      chosenCohortId = rawCohort;
+    } else {
+      return NextResponse.json({ error: "המחזור שנבחר אינו תקין." }, { status: 400 });
+    }
+  }
+
   try {
-    // ownerId + courseType come from the session; cohort/team come from the staff
-    // user's CURRENT assignment (server-derived) — never from the request body.
+    // ownerId + courseType come from the session. Cohort/team default to the staff
+    // user's CURRENT assignment (server-derived); a valid client-chosen cohort in the
+    // same course may override the cohort (team stays from the assignment).
     const assignment = await getCurrentAssignment(auth.scope.ownerId);
     const trainee = await createTrainee(parsed.data as TraineeInput, auth.scope, {
-      cohortId: assignment?.cohortId ?? null,
+      cohortId: chosenCohortId !== undefined ? chosenCohortId : assignment?.cohortId ?? null,
       teamId: assignment?.teamId ?? null,
     });
     console.log(`[api/trainees] created ${trainee.id} → 201`);

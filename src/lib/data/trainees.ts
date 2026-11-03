@@ -42,6 +42,18 @@ export type TraineeOrgContext = {
   teamId?: string | null;
 };
 
+/** Metadata referencing the source file a trainee was imported from. The binary is
+ *  NOT here — it lives in FileStorage under `storageKey`. Never exposed to the client. */
+export type TraineeSourceImport = {
+  originalFileName: string;
+  mimeType: string;
+  size: number;
+  storageKey: string;
+  extractionStatus: string;
+  uploadedBy: string;
+  uploadedAt: Date;
+};
+
 type LeanTrainee = {
   _id: unknown;
   fullName?: string;
@@ -122,6 +134,7 @@ export async function createTrainee(
   input: TraineeInput,
   scope: OwnerScope,
   org: TraineeOrgContext = {},
+  source?: TraineeSourceImport,
 ): Promise<TraineeDTO> {
   await connectToDatabase();
   const owner = new Types.ObjectId(scope.ownerId);
@@ -139,6 +152,17 @@ export async function createTrainee(
     cohortId: org.cohortId && isValidObjectId(org.cohortId) ? new Types.ObjectId(org.cohortId) : undefined,
     teamId: org.teamId && isValidObjectId(org.teamId) ? new Types.ObjectId(org.teamId) : undefined,
     status: "active",
+    sourceImport: source
+      ? {
+          originalFileName: source.originalFileName,
+          mimeType: source.mimeType,
+          size: source.size,
+          storageKey: source.storageKey,
+          extractionStatus: source.extractionStatus,
+          uploadedBy: isValidObjectId(source.uploadedBy) ? new Types.ObjectId(source.uploadedBy) : undefined,
+          uploadedAt: source.uploadedAt,
+        }
+      : undefined,
   });
   return serialize(doc.toObject() as LeanTrainee);
 }
@@ -189,12 +213,19 @@ export async function updateTraineeById(
   id: string,
   patch: Partial<TraineeInput>,
   editorId: string,
+  org: { cohortId?: string | null } = {},
 ): Promise<TraineeDTO | null> {
   if (!isValidObjectId(id)) return null;
   await connectToDatabase();
+  const set: Record<string, unknown> = { ...patch, lastUpdatedBy: new Types.ObjectId(editorId) };
+  // Cohort is a placement/filter field (validated by the caller against the course).
+  // `null`/"" clears the assignment ("ללא שיוך למחזור"); a valid id sets it.
+  if (org.cohortId !== undefined) {
+    set.cohortId = org.cohortId && isValidObjectId(org.cohortId) ? new Types.ObjectId(org.cohortId) : null;
+  }
   const doc = await Trainee.findByIdAndUpdate(
     id,
-    { $set: { ...patch, lastUpdatedBy: new Types.ObjectId(editorId) } },
+    { $set: set },
     { new: true, runValidators: true },
   ).lean<LeanTrainee | null>();
   return doc ? serialize(doc) : null;

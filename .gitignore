@@ -38,3 +38,14 @@ dev.log
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+
+# Claude Code per-developer settings (holds the local Impeccable hook wiring)
+.claude/settings.local.json
+# Impeccable per-developer config and hook cache (shared .impeccable/config.json stays tracked)
+.impeccable/config.local.json
+.impeccable/hook.cache.json
+
+# Playwright MCP output
+.playwright-mcp/

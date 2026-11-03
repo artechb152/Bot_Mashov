@@ -131,6 +131,18 @@ export const FEEDBACK_TYPES = [
 ] as const;
 export type FeedbackType = (typeof FEEDBACK_TYPES)[number];
 
+/** Narrow an untrusted value (request body) to a FeedbackType. */
+export function isFeedbackType(value: unknown): value is FeedbackType {
+  return typeof value === "string" && (FEEDBACK_TYPES as readonly string[]).includes(value);
+}
+
+/** Feedback record lifecycle (active vs soft-archived — there is no hard delete). */
+export const FEEDBACK_STATUSES = ["active", "archived"] as const;
+export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number];
+export function isFeedbackStatus(value: unknown): value is FeedbackStatus {
+  return typeof value === "string" && (FEEDBACK_STATUSES as readonly string[]).includes(value);
+}
+
 export const DIFFICULTIES = ["easy", "medium", "hard"] as const;
 export type Difficulty = (typeof DIFFICULTIES)[number];
 
@@ -224,6 +236,11 @@ export const FEEDBACK_TYPE_LABELS: Record<FeedbackType, string> = {
   final_exercise: "תרגיל מסכם",
   feedback_on_feedback: "משוב על משוב",
   other: "אחר",
+};
+
+export const FEEDBACK_STATUS_LABELS: Record<FeedbackStatus, string> = {
+  active: "פעיל",
+  archived: "בארכיון",
 };
 
 export const DIFFICULTY_LABELS: Record<Difficulty, string> = {

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ComposePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const account = await getAccount();
-  if (!account) redirect("/login");
+  if (!account) redirect("/");
   const sp = await searchParams;
   const draftId = typeof sp.draft === "string" ? sp.draft : undefined;
   // `to` preselects a recipient (from a profile / user list). It is validated

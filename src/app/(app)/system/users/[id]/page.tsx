@@ -14,7 +14,7 @@ type PageProps = { params: Promise<{ id: string }> };
 
 export default async function SystemUserPage({ params }: PageProps) {
   const auth = await requireSuperAdmin();
-  if (!auth.ok) redirect("/login");
+  if (!auth.ok) redirect("/");
   const { id } = await params;
 
   const [account, user] = await Promise.all([getAccount(), getAdminUser(auth.grant, id)]);

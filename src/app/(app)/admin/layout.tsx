@@ -1,17 +1,23 @@
 import { redirect } from "next/navigation";
 import { getAccount } from "@/lib/auth/account";
 import { isAdminRole } from "@/lib/domain/types";
+import { AreaNav } from "@/components/layout/AreaNav";
+import { navForRole } from "@/lib/navigation";
 
 /**
- * Page-level gate for the management area. It now lives INSIDE the persistent (app)
- * shell (one shared sidebar), so this layout only enforces the role — the shell and
- * navigation come from `(app)/layout.tsx`. The /api/admin/* handlers re-check via
- * requireAdmin() (DB-fresh), so a user demoted a moment ago is bounced on their next
- * navigation.
+ * The management area ("ניהול המערכת"). The main sidebar is course/cohort-only, so
+ * administration navigates via the horizontal {@link AreaNav} rendered here. Enforces
+ * the role; every /api/admin/* handler re-checks via requireAdmin() (DB-fresh).
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const account = await getAccount();
-  if (!account) redirect("/login");
-  if (!isAdminRole(account.role)) redirect("/trainees");
-  return <>{children}</>;
+  if (!account) redirect("/");
+  if (!isAdminRole(account.role)) redirect("/workspace");
+  const items = navForRole(account.role, account.rootProfile);
+  return (
+    <div>
+      <AreaNav items={items} />
+      {children}
+    </div>
+  );
 }

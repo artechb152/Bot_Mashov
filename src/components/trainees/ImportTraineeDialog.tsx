@@ -1,10 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FileText, Upload } from "lucide-react";
-import { Button, Dialog, Field, Input, Textarea } from "@/components/ui";
+import { Button, Dialog, Field, Input, Select, Textarea } from "@/components/ui";
 import { arrayToLines, linesToArray } from "@/lib/text";
 import type { TraineeDTO } from "@/lib/data/trainees";
+
+type CohortOption = { id: string; name: string };
 
 type PreviewResponse = {
   fields?: {
@@ -15,6 +17,9 @@ type PreviewResponse = {
     notes?: string;
   };
   warnings?: string[];
+  aiUsed?: boolean;
+  extractionStatus?: string;
+  suggestedCohortName?: string | null;
   file?: { name: string; size: number };
   error?: string;
 };
@@ -26,15 +31,18 @@ function formatSize(bytes: number): string {
 }
 
 /**
- * "הוספת חניך מקובץ" — a two-step import.
+ * "ייבוא מקובץ" — the file-based path to create a trainee (the manual form remains the
+ * other path). Two steps:
  *
- *   1. pick a file → it is read on the server, which extracts what it can
- *      (nothing is created yet);
- *   2. the extracted fields open in an EDITABLE review form. Only when the user
- *      confirms is the trainee created, with the original file attached to it.
+ *   1. pick a PDF/DOCX/TXT → the server extracts the text and, when AI is connected,
+ *      turns it into structured trainee fields (nothing is created yet);
+ *   2. the extracted fields open in an EDITABLE review form. The user reviews/completes
+ *      them, optionally picks a cohort, and only on confirm is the trainee created —
+ *      with the original file kept as its source reference.
  *
- * Formats we cannot read (PDF, DOCX…) still reach step 2 — with empty fields and
- * a clear warning — so the file is attached and the details are typed in by hand.
+ * Files we cannot read (scanned PDFs) or an unavailable AI still reach step 2 — with
+ * empty fields and a clear message — so the details are typed in by hand. Nothing is
+ * ever fabricated on the user's behalf.
  */
 export function ImportTraineeDialog() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -45,6 +53,7 @@ export function ImportTraineeDialog() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [suggestedCohortName, setSuggestedCohortName] = useState<string | null>(null);
 
   // Reviewed (editable) fields.
   const [fullName, setFullName] = useState("");
@@ -52,16 +61,34 @@ export function ImportTraineeDialog() {
   const [strengthsText, setStrengthsText] = useState("");
   const [weaknessesText, setWeaknessesText] = useState("");
   const [notes, setNotes] = useState("");
+  const [cohortId, setCohortId] = useState("");
+
+  // Cohorts of the caller's course, so the human maps any suggested cohort to a real one.
+  const [cohorts, setCohorts] = useState<CohortOption[]>([]);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/cohorts")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { cohorts?: CohortOption[] } | null) => {
+        if (active && d?.cohorts) setCohorts(d.cohorts);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function reset() {
     setFile(null);
     setWarnings([]);
+    setSuggestedCohortName(null);
     setError(null);
     setFullName("");
     setTeam("");
     setStrengthsText("");
     setWeaknessesText("");
     setNotes("");
+    setCohortId("");
   }
 
   function closeDialog() {
@@ -98,6 +125,7 @@ export function ImportTraineeDialog() {
       setWeaknessesText(arrayToLines(f.weaknesses));
       setNotes(f.notes ?? "");
       setWarnings(data.warnings ?? []);
+      setSuggestedCohortName(data.suggestedCohortName ?? null);
       setOpen(true);
     } catch {
       setError("קריאת הקובץ נכשלה. בדקו את החיבור ונסו שוב.");
@@ -107,13 +135,13 @@ export function ImportTraineeDialog() {
     }
   }
 
-  /** Step 2 — confirm. Creates the trainee AND attaches the source file. */
+  /** Step 2 — confirm. Creates the trainee AND references the source file. */
   async function handleConfirm(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
 
     if (!fullName.trim()) {
-      setError("שם מלא הוא שדה חובה.");
+      setError("שם החניך הוא שדה חובה.");
       return;
     }
     if (!file) {
@@ -122,12 +150,11 @@ export function ImportTraineeDialog() {
     }
 
     setSubmitting(true);
-    // Set once a full-page navigation starts, so `finally` keeps the button
-    // disabled through the unload (no flash, no double submit).
     let navigating = false;
     try {
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("cohortId", cohortId);
       fd.append(
         "fields",
         JSON.stringify({
@@ -140,18 +167,13 @@ export function ImportTraineeDialog() {
       );
 
       const res = await fetch("/api/trainees/import", { method: "POST", body: fd });
-      const data = (await res.json().catch(() => ({}))) as {
-        trainee?: TraineeDTO;
-        error?: string;
-      };
+      const data = (await res.json().catch(() => ({}))) as { trainee?: TraineeDTO; error?: string };
 
       if (!res.ok) {
         setError(data.error ?? "יצירת החניך מהקובץ נכשלה.");
         return;
       }
 
-      // Success: full-page navigation to the new profile so it shows immediately
-      // — no manual refresh.
       navigating = true;
       window.location.assign(data.trainee ? `/trainees/${data.trainee.id}` : "/trainees");
     } catch {
@@ -166,6 +188,7 @@ export function ImportTraineeDialog() {
       <input
         ref={fileInputRef}
         type="file"
+        accept=".pdf,.docx,.txt,.md,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
         className="hidden"
         aria-hidden="true"
         tabIndex={-1}
@@ -178,7 +201,7 @@ export function ImportTraineeDialog() {
         disabled={reading}
       >
         <Upload className="h-4 w-4" aria-hidden="true" />
-        {reading ? "קורא קובץ…" : "הוספת חניך מקובץ"}
+        {reading ? "קורא קובץ…" : "ייבוא מקובץ"}
       </Button>
 
       {/* A preview error has no dialog to live in — surface it beside the button. */}
@@ -191,16 +214,18 @@ export function ImportTraineeDialog() {
         </p>
       ) : null}
 
-      <Dialog open={open} onClose={closeDialog} title="בדיקת פרטי החניך" className="max-w-2xl">
+      <Dialog open={open} onClose={closeDialog} title="אישור פרטי החניך שחולצו" className="max-w-2xl">
         <form onSubmit={handleConfirm} className="space-y-5" noValidate>
           <p className="text-sm text-muted">
-            אלו הפרטים שזוהו בקובץ. אפשר לערוך אותם — החניך ייווצר רק לאחר אישור.
+            אלו הפרטים שחולצו מהקובץ. בדקו, השלימו ותקנו לפי הצורך — החניך ייווצר רק לאחר אישור.
           </p>
 
           {warnings.length > 0 ? (
             <ul className="space-y-1 rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-muted">
               {warnings.map((w, i) => (
-                <li key={i}>{w}</li>
+                <li key={i} className="break-words">
+                  {w}
+                </li>
               ))}
             </ul>
           ) : null}
@@ -225,12 +250,27 @@ export function ImportTraineeDialog() {
           </Field>
 
           <Field label="צוות" htmlFor="import-team" hint="לא חובה">
-            <Input
-              id="import-team"
-              value={team}
-              onChange={(e) => setTeam(e.target.value)}
-              autoComplete="off"
-            />
+            <Input id="import-team" value={team} onChange={(e) => setTeam(e.target.value)} autoComplete="off" />
+          </Field>
+
+          <Field
+            label="מחזור"
+            htmlFor="import-cohort"
+            hint={suggestedCohortName ? `הוזכר בקובץ: "${suggestedCohortName}" — בחרו מחזור מתאים` : "לשיוך החניך למחזור בקורס"}
+          >
+            <Select
+              id="import-cohort"
+              value={cohortId}
+              onChange={(e) => setCohortId(e.target.value)}
+              disabled={submitting}
+            >
+              <option value="">ללא שיוך למחזור</option>
+              {cohorts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -255,23 +295,16 @@ export function ImportTraineeDialog() {
           </div>
 
           <Field label="הערות מפקד" htmlFor="import-notes" hint="לא חובה">
-            <Textarea
-              id="import-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-            />
+            <Textarea id="import-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
           </Field>
 
-          {/* The source file — attached to the trainee on confirm. */}
+          {/* The source file — referenced by the trainee on confirm. */}
           {file ? (
             <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2">
               <FileText className="h-5 w-5 shrink-0 text-subtle" aria-hidden="true" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm text-ink">{file.name}</p>
-                <p className="text-xs text-muted">
-                  {formatSize(file.size)} · הקובץ יצורף לתיק החניך
-                </p>
+                <p className="text-xs text-muted">{formatSize(file.size)} · הקובץ יישמר כמקור של תיק החניך</p>
               </div>
             </div>
           ) : null}

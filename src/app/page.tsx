@@ -1,23 +1,21 @@
-import { LandingScreen } from "@/components/landing/LandingScreen";
-import { getAccount } from "@/lib/auth/account";
-import type { UserRole } from "@/lib/domain/types";
+import { redirect } from "next/navigation";
+import { AuthEntry } from "@/components/auth/AuthEntry";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
 export const dynamic = "force-dynamic";
 
-/**
- * The product entry / landing screen (outside the `(app)` shell — public). It shows
- * one primary action whose destination is chosen SERVER-SIDE by role (§37):
- * staff → the bot, admin → the course dashboard, super_admin/root → the system
- * dashboard. Unauthenticated visitors get a login button.
- */
-function destinationFor(role: UserRole): string {
-  if (role === "super_admin") return "/system";
-  if (role === "admin") return "/admin";
-  return "/assistant";
-}
+type PageProps = { searchParams: Promise<{ mode?: string; next?: string }> };
 
-export default async function HomePage() {
-  const account = await getAccount();
-  const destination = account ? destinationFor(account.role) : null;
-  return <LandingScreen username={account?.username ?? null} destination={destination} />;
+/**
+ * The product entry point. There are exactly two states (no landing, no modal):
+ *   - signed in  → straight to the work area (/workspace);
+ *   - guest      → the self-contained login/signup page.
+ * A returning user who still has a valid session lands directly in /workspace.
+ */
+export default async function HomePage({ searchParams }: PageProps) {
+  const user = await getCurrentUser();
+  if (user) redirect("/workspace");
+
+  const { mode, next } = await searchParams;
+  return <AuthEntry initialMode={mode === "signup" ? "signup" : "login"} next={next} />;
 }

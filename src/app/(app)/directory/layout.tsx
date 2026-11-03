@@ -8,8 +8,8 @@ import { getAccount } from "@/lib/auth/account";
  */
 export default async function DirectoryLayout({ children }: { children: React.ReactNode }) {
   const account = await getAccount();
-  if (!account) redirect("/login");
-  if (account.status !== "active") redirect("/login");
+  if (!account) redirect("/");
+  if (account.status !== "active") redirect("/");
 
   return <div className="mx-auto max-w-3xl">{children}</div>;
 }

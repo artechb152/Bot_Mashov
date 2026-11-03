@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SystemUsersPage() {
   const auth = await requireSuperAdmin();
-  if (!auth.ok) redirect("/login");
+  if (!auth.ok) redirect("/");
   const users = await listAllUsers(auth.grant);
 
   return (

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DirectoryPage() {
   const account = await getAccount();
-  if (!account) redirect("/login");
+  if (!account) redirect("/");
   const directory = await listDirectory(account);
 
   return (

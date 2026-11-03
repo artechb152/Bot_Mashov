@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SystemCoursesPage() {
   const auth = await requireSuperAdmin();
-  if (!auth.ok) redirect("/login");
+  if (!auth.ok) redirect("/");
 
   const [courses, users, trainees] = await Promise.all([
     listCourses(),

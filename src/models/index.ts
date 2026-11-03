@@ -32,3 +32,8 @@ export { MessageDraft, type MessageDraftDoc } from "./MessageDraft";
 // Access requests + trainee-access grants.
 export { AccessRequest, type AccessRequestDoc } from "./AccessRequest";
 export { TraineeAccessGrant, type TraineeAccessGrantDoc } from "./TraineeAccessGrant";
+
+// AI assistant conversations + versioned trainee insights.
+export { AssistantConversation, type AssistantConversationDoc } from "./AssistantConversation";
+export { AssistantTurn, type AssistantTurnDoc } from "./AssistantTurn";
+export { TraineeAIInsight, type TraineeAIInsightDoc } from "./TraineeAIInsight";

@@ -17,7 +17,7 @@ export default async function TraineesPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/");
   const scope = scopeFromSession(user);
   if (!scope) redirect("/select-course");
 

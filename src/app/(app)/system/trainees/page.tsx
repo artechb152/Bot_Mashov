@@ -7,9 +7,13 @@ import { listAllTrainees, listAllUsers } from "@/lib/data/admin";
 export const metadata = { title: "כל תיקי החניך" };
 export const dynamic = "force-dynamic";
 
+/**
+ * System-wide management view of trainee files (all courses). A management tool — it
+ * does NOT replace /workspace. Lives inside the system layout so the AreaNav stays.
+ */
 export default async function SystemTraineesPage() {
   const auth = await requireSuperAdmin();
-  if (!auth.ok) redirect("/login");
+  if (!auth.ok) redirect("/");
 
   const [trainees, users] = await Promise.all([listAllTrainees(auth.grant), listAllUsers(auth.grant)]);
   const staff = users.filter((u) => u.role === "staff").map((u) => ({ id: u.id, label: u.displayName || u.username }));

@@ -1,7 +1,8 @@
-import { SecuritySettingsForm } from "@/components/settings/SecuritySettingsForm";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default function SecuritySettingsPage() {
-  return <SecuritySettingsForm />;
+/** Password change now lives on the single profile page (§1/§12). */
+export default function SecurityMerged() {
+  redirect("/settings/profile");
 }

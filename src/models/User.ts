@@ -55,6 +55,11 @@ const userSchema = new Schema(
     courseType: { type: String, enum: [...COURSE_TYPES] },
     // Additive denormalized ref, carried but not yet filtered on for authz.
     courseId: { type: Schema.Types.ObjectId, ref: "Course" },
+    // Personal preference: the cohort the work area opens on. NOT an authz field —
+    // access is still course+owner+grants. Set by the user (selecting a cohort) and
+    // stamped for the creator when they create a cohort. Falls back at resolve time
+    // when absent/invalid (current assignment → most recent accessible cohort).
+    defaultCohortId: { type: Schema.Types.ObjectId, ref: "Cohort" },
 
     // Activity ---------------------------------------------------------------
     lastLoginAt: { type: Date },

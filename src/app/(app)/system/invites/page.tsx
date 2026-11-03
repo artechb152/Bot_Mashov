@@ -14,8 +14,8 @@ export default async function SystemInvitesPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
-        title="קודי הרשאה"
-        description="קודי הרשאת מנהל חד־פעמיים, לכל קורס, עם תפוגה. הקוד מוצג פעם אחת בלבד בעת היצירה."
+        title="קודי גישה"
+        description="קודי גישה חד־פעמיים ליצירת חשבון מנהל חדש, לכל קורס, עם תפוגה. הקוד מוצג פעם אחת בלבד בעת היצירה."
       />
       <InvitesManager
         initialInvites={invites}

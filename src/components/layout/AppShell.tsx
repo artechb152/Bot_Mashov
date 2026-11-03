@@ -9,22 +9,24 @@ import type { RootProfile, UserRole } from "@/lib/domain/types";
 import { DirectoryFlyout } from "@/components/directory/DirectoryFlyout";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import type { WorkspaceNav } from "@/lib/data/workspace-nav";
 
 /**
  * Client shell that composes the sidebar + topbar around page content and
  * manages the mobile navigation drawer. In RTL the rail sits on the right and
  * the mobile drawer slides in from the inline-start (right) edge.
  *
- * The bot page (`/assistant`) is a full-screen chat: it drops the section
- * topbar and fills the whole viewport height with its own single work bar. On
- * that route the mobile nav toggle becomes a small floating button so the
- * drawer stays reachable without adding a second bar.
+ * Two surfaces are full-bleed — the bot page (`/assistant`) and the trainee work
+ * area (`/workspace`): they drop the section topbar and fill the whole viewport
+ * height with their own internal layout. On those routes the mobile nav toggle
+ * becomes a small floating button so the drawer stays reachable without a second bar.
  */
 export function AppShell({
   children,
   user,
   role,
   rootProfile,
+  nav,
 }: {
   children: React.ReactNode;
   user: SessionUser;
@@ -32,11 +34,14 @@ export function AppShell({
   role?: UserRole;
   /** Protected-root profile — drives the crown + platform-owner nav variant. */
   rootProfile?: RootProfile | null;
+  /** Course → cohort tree + resolved active cohort (absent for platform-owner). */
+  nav?: WorkspaceNav | null;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [directoryOpen, setDirectoryOpen] = useState(false);
   const pathname = usePathname();
-  const isChat = pathname === "/assistant";
+  // Full-bleed surfaces manage their own height + scrolling (no section topbar).
+  const isChat = pathname === "/assistant" || pathname === "/workspace";
   const openDirectory = () => setDirectoryOpen(true);
 
   return (
@@ -49,6 +54,8 @@ export function AppShell({
         courseType={user.courseType}
         role={role}
         rootProfile={rootProfile}
+        username={user.username}
+        nav={nav}
         onOpenDirectory={openDirectory}
         className="sticky top-0 hidden h-screen self-start lg:block"
       />
@@ -66,6 +73,8 @@ export function AppShell({
         courseType={user.courseType}
         role={role}
         rootProfile={rootProfile}
+        username={user.username}
+        nav={nav}
         onOpenDirectory={openDirectory}
         onNavigate={() => setMobileOpen(false)}
         className={cn(

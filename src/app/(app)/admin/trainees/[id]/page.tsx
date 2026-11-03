@@ -33,7 +33,7 @@ function ItemList({ items, emptyText }: { items: string[]; emptyText: string }) 
 
 export default async function AdminTraineeProfilePage({ params }: PageProps) {
   const auth = await requireAdmin();
-  if (!auth.ok) redirect("/login");
+  if (!auth.ok) redirect("/");
   const { id } = await params;
 
   const trainee = await adminGetTrainee(auth.grant, id);

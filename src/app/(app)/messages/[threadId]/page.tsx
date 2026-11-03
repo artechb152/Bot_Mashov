@@ -9,7 +9,7 @@ type PageProps = { params: Promise<{ threadId: string }> };
 
 export default async function ThreadPage({ params }: PageProps) {
   const account = await getAccount();
-  if (!account) redirect("/login");
+  if (!account) redirect("/");
   const { threadId } = await params;
   const thread = await getThreadForUser(account, threadId);
   if (!thread) notFound(); // not a participant → not found (no probing)

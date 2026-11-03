@@ -9,7 +9,7 @@ type PageProps = { params: Promise<{ id: string }> };
 
 export default async function RequestDetailPage({ params }: PageProps) {
   const account = await getAccount();
-  if (!account) redirect("/login");
+  if (!account) redirect("/");
   const { id } = await params;
   const request = await getRequest(account, id);
   if (!request) notFound(); // not requester or reviewer → not found

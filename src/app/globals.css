@@ -27,6 +27,30 @@
   /* Sanctioned soft error/danger surface (the one allowed colour exception). */
   --color-danger-surface: #fef2f2;
   --color-danger-line: #fecaca;
+
+  /*
+   * Functional accents (§ "צבעים ופונקציונליות"). Used sparingly and only where the
+   * meaning is intrinsic — never decoratively. Soft, operational tones:
+   *   success → strengths / "keep" ;  warn → focus areas / needs-attention / stale.
+   */
+  --color-success: #4d7c0f;
+  --color-success-surface: #f4f8ec;
+  --color-success-line: #d7e5bd;
+  --color-warn: #b45309;
+  --color-warn-surface: #fff7ed;
+  --color-warn-line: #fde3c0;
+
+  /*
+   * Brand palette — חונך+ (brand rollout, step 1). Consume via the generated
+   * utilities (bg-brand-action, text-brand-primary, …); never hardcode these hexes
+   * in components. Status colours above are intentionally left untouched.
+   */
+  --color-brand-primary: #243e6b;      /* navy — the wordmark word, primary brand */
+  --color-brand-secondary: #6b7f4a;    /* olive — secondary details only */
+  --color-brand-action: #2e6bd6;       /* action blue — primary CTA, the "+", focus */
+  --color-brand-action-hover: #245bb8; /* action blue, hover */
+  --color-brand-surface: #f4f2ee;      /* light filler surface */
+  --color-brand-navy-deep: #1a2b49;    /* deep navy — dark landing/auth field base */
 }
 
 @layer base {
@@ -49,5 +73,32 @@
   ::selection {
     background-color: #0f172a;
     color: #f8fafc;
+  }
+}
+
+/*
+ * Focused micro-interactions (§ "מיקרו-אינטראקציות"). Deliberately small and calm —
+ * a short fade/slide for a newly added row, and a soft pulse when a draft goes stale.
+ * All motion is disabled under prefers-reduced-motion below.
+ */
+@keyframes ws-row-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@layer utilities {
+  .ws-row-enter {
+    animation: ws-row-in 0.18s ease-out both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

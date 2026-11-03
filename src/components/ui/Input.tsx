@@ -1,11 +1,16 @@
+import { forwardRef } from "react";
 import { cn } from "@/lib/cn";
 
 export type InputProps = React.ComponentPropsWithoutRef<"input">;
 
 /** Styled text input. Pair with a `<label htmlFor>` for accessibility. */
-export function Input({ className, type = "text", ...props }: InputProps) {
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+  { className, type = "text", ...props },
+  ref,
+) {
   return (
     <input
+      ref={ref}
       type={type}
       className={cn(
         "h-10 w-full rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink",
@@ -17,4 +22,4 @@ export function Input({ className, type = "text", ...props }: InputProps) {
       {...props}
     />
   );
-}
+});

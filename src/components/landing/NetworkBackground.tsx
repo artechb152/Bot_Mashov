@@ -89,7 +89,7 @@ export function NetworkBackground({ className }: { className?: string }) {
           const b = nodes[j];
           const dist = Math.hypot(a.x - b.x, a.y - b.y);
           if (dist < LINK_DISTANCE) {
-            ctx!.strokeStyle = `rgba(148, 163, 184, ${(1 - dist / LINK_DISTANCE) * 0.22})`;
+            ctx!.strokeStyle = `rgba(148, 163, 184, ${(1 - dist / LINK_DISTANCE) * 0.3})`;
             ctx!.lineWidth = 1;
             ctx!.beginPath();
             ctx!.moveTo(a.x, a.y);
@@ -98,7 +98,7 @@ export function NetworkBackground({ className }: { className?: string }) {
           }
         }
       }
-      ctx!.fillStyle = "rgba(203, 213, 225, 0.7)";
+      ctx!.fillStyle = "rgba(203, 213, 225, 0.85)";
       for (const n of nodes) {
         ctx!.beginPath();
         ctx!.arc(n.x, n.y, 1.6, 0, Math.PI * 2);

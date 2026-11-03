@@ -1,15 +1,14 @@
 /**
- * Single source of truth for the product's identity.
- * Rename the product everywhere by editing the values here.
- *
- * "מצפן" (compass) is a working placeholder brand mark.
+ * Single source of truth for the product's identity (plain text — for the document
+ * title, metadata, and any place that needs a string). The *visual* brand mark is
+ * the shared `BrandWordmark` component; this is only the textual name.
  */
 export const siteConfig = {
-  /** Short brand mark shown in the sidebar and title template. */
-  name: "מצפן",
+  /** Short brand mark (plain text) used in the title template. */
+  name: "חונך+",
   /** Full title used as the default document title. */
-  fullName: "מצפן · מערכת פיקוד וניהול הדרכה",
+  fullName: "חונך+ | מערכת חניכה ומשוב",
   /** One-line description used in metadata. */
   description:
-    "מערכת חניכה ומשוב לסגל ההדרכה — ניהול חניכים ותיקי חניך, במקום אחד.",
+    "כלי חכם לחניכה, משוב, סיכום ומעקב אחר התקדמות החניכים.",
 } as const;

@@ -39,7 +39,7 @@ function formatDate(iso: string | null): string {
 
 export default async function SystemAuditPage() {
   const auth = await requireSuperAdmin();
-  if (!auth.ok) redirect("/login");
+  if (!auth.ok) redirect("/");
   const logs = await listAuditLogs({ limit: 200 });
 
   return (

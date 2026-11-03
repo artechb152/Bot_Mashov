@@ -123,7 +123,7 @@ export function SignupForm() {
         return;
       }
       navigating = true;
-      window.location.assign("/");
+      window.location.assign("/workspace");
     } catch {
       setError("ההרשמה נכשלה. בדקו את החיבור ונסו שוב.");
     } finally {
