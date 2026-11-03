@@ -13,9 +13,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       ref={ref}
       type={type}
       className={cn(
-        "h-10 w-full rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink",
+        // 16px on phones so iOS does not zoom the page on focus; 14px from `sm` up.
+        "h-11 w-full rounded-lg border border-control bg-surface px-3 text-base text-ink sm:h-10 sm:text-sm",
         "placeholder:text-subtle transition-colors",
-        "focus-visible:border-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15",
+        "focus-visible:border-focus focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}

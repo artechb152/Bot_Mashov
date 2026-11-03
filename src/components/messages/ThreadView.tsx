@@ -129,7 +129,7 @@ export function ThreadView({ thread }: { thread: Thread }) {
             className={
               m.isSystem
                 ? "rounded-lg border border-line bg-surface-2 px-4 py-2.5 text-sm text-muted"
-                : `rounded-lg border px-4 py-3 ${m.mine ? "border-slate-800 bg-slate-900 text-white" : "border-line bg-surface text-ink"}`
+                : `rounded-lg border px-4 py-3 ${m.mine ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink"}`
             }
           >
             {!m.isSystem ? (

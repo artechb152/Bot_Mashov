@@ -139,7 +139,7 @@ export function AssistantChat({ trainees, initialTraineeId = "", username }: Ass
                 "max-w-[92%] whitespace-pre-wrap break-words rounded-2xl px-5 py-3 text-sm leading-relaxed sm:max-w-[85%]",
                 m.role === "bot"
                   ? "self-start border border-line bg-surface text-ink"
-                  : "self-end bg-slate-900 text-white",
+                  : "self-end bg-ink text-white",
               )}
             >
               {m.text}
@@ -214,9 +214,9 @@ export function AssistantChat({ trainees, initialTraineeId = "", username }: Ass
             placeholder="כתוב הודעה לבוט..."
             aria-label="הודעה לבוט"
             className={cn(
-              "max-h-[200px] min-h-[3rem] flex-1 resize-none overflow-hidden rounded-2xl border border-line-strong bg-surface px-4 py-3 text-sm leading-relaxed text-ink",
+              "max-h-[200px] min-h-[3rem] flex-1 resize-none overflow-hidden rounded-2xl border border-control bg-surface px-4 py-3 text-sm leading-relaxed text-ink",
               "placeholder:text-subtle transition-colors",
-              "focus-visible:border-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15",
+              "focus-visible:border-focus focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25",
             )}
           />
           {/* Left (inline-end in RTL): add files (local only) */}

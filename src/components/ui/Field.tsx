@@ -22,7 +22,7 @@ export function Field({ label, htmlFor, required, hint, children, className }: F
             *
           </span>
         ) : null}
-        {hint ? <span className="text-xs font-normal text-subtle">· {hint}</span> : null}
+        {hint ? <span className="text-sm font-normal text-subtle">· {hint}</span> : null}
       </label>
       {children}
     </div>

@@ -188,7 +188,7 @@ export function InvitesManager({
                     type="checkbox"
                     checked={positions.has(p)}
                     onChange={() => togglePosition(p)}
-                    className="h-4 w-4 rounded border-line-strong text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-900/15"
+                    className="h-4 w-4 rounded border-line-strong text-primary focus-visible:ring-2 focus-visible:ring-focus"
                   />
                   {ADMIN_POSITION_LABELS[p]}
                 </label>

@@ -49,14 +49,14 @@ export function FilterPopover({
         aria-expanded={open}
         aria-haspopup="dialog"
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15",
-          activeCount > 0 && "border-slate-900",
+          "inline-flex items-center gap-1.5 h-10 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
+          activeCount > 0 && "border-ink",
         )}
       >
         <SlidersHorizontal className="h-4 w-4 text-subtle" aria-hidden="true" />
         סינון
         {activeCount > 0 ? (
-          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-slate-900 px-1 text-xs font-semibold text-white">
+          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-ink px-1 text-xs font-semibold text-white">
             {activeCount}
           </span>
         ) : null}
