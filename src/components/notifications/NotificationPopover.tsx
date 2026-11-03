@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { useAnchoredPosition } from "@/lib/hooks/useAnchoredPosition";
 import { NotificationsList } from "./NotificationsList";
 
@@ -53,7 +54,7 @@ export function NotificationPopover({
         if (!cancelled) setItems(d.notifications ?? []);
       })
       .catch(() => {
-        if (!cancelled) setError("טעינת ההתראות נכשלה. נסו שוב.");
+        if (!cancelled) setError("טעינת העדכונים נכשלה. נסו שוב.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -70,17 +71,24 @@ export function NotificationPopover({
       ref={panelRef}
       dir="rtl"
       role="dialog"
-      aria-label="התראות"
+      aria-label="עדכונים"
       style={style}
-      className="z-50 flex flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-lg"
+      className="z-50 flex flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-lg"
     >
-      <div className="shrink-0 border-b border-line px-3 py-2.5">
-        <h2 className="text-sm font-semibold text-ink">התראות</h2>
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line py-1.5 pe-1.5 ps-3">
+        <h2 className="text-sm font-semibold text-ink">עדכונים</h2>
+        <Link
+          href="/notifications"
+          onClick={onNavigate}
+          className="inline-flex h-9 items-center rounded-lg px-2.5 text-sm font-medium text-primary transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          לכל העדכונים
+        </Link>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {loading ? <p className="px-1 py-2 text-sm text-muted">טוען…</p> : null}
-        {error ? <p className="px-1 py-2 text-sm text-danger">{error}</p> : null}
-        {items ? <NotificationsList initial={items} onNavigate={onNavigate} /> : null}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {loading ? <p className="px-3 py-3 text-sm text-muted">טוען…</p> : null}
+        {error ? <p role="alert" className="px-3 py-3 text-sm text-danger">{error}</p> : null}
+        {items ? <NotificationsList initial={items} onNavigate={onNavigate} compact /> : null}
       </div>
     </div>,
     document.body,

@@ -61,11 +61,11 @@ export function AdminUsersList({ users }: { users: AdminUserDTO[] }) {
           <THead>
             <tr>
               <TH>שם משתמש</TH>
-              <TH>קורס</TH>
-              <TH>תפקיד</TH>
+              <TH className="hidden sm:table-cell">קורס</TH>
+              <TH className="hidden sm:table-cell">תפקיד</TH>
               <TH>חניכים</TH>
-              <TH>נוצר</TH>
-              <TH>
+              <TH className="hidden md:table-cell">נוצר</TH>
+              <TH className="hidden sm:table-cell">
                 <span className="sr-only">פעולות</span>
               </TH>
             </tr>
@@ -74,15 +74,20 @@ export function AdminUsersList({ users }: { users: AdminUserDTO[] }) {
             {filtered.map((u) => (
               <TR key={u.id}>
                 <TD className="font-medium">
-                  <Link href={`/admin/users/${u.id}`} className="hover:underline">
+                  {/* The name is the row's primary link, so phones need no trailing column. */}
+                  <Link href={`/admin/users/${u.id}`} className="break-all hover:underline" dir="auto">
                     {u.username}
                   </Link>
+                  <span className="block text-sm font-normal text-muted sm:hidden">
+                    {USER_ROLE_LABELS[u.role]}
+                    {u.courseType ? ` · ${COURSE_LABELS[u.courseType]}` : ""}
+                  </span>
                 </TD>
-                <TD className="text-muted">{u.courseType ? COURSE_LABELS[u.courseType] : "—"}</TD>
-                <TD className="text-muted">{USER_ROLE_LABELS[u.role]}</TD>
+                <TD className="hidden text-muted sm:table-cell">{u.courseType ? COURSE_LABELS[u.courseType] : "—"}</TD>
+                <TD className="hidden text-muted sm:table-cell">{USER_ROLE_LABELS[u.role]}</TD>
                 <TD className="text-muted tabular-nums">{u.traineeCount}</TD>
-                <TD className="text-muted tabular-nums">{formatDate(u.createdAt)}</TD>
-                <TD className="text-end">
+                <TD className="hidden text-muted tabular-nums md:table-cell">{formatDate(u.createdAt)}</TD>
+                <TD className="hidden text-end sm:table-cell">
                   <Link
                     href={`/admin/users/${u.id}`}
                     className="inline-flex items-center gap-1 text-sm font-medium text-ink hover:underline"

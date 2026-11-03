@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ChevronLeft, Plus } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Button, Dialog, Field, Input, Select, Textarea } from "@/components/ui";
 import { EMPTY_FEEDBACK_DRAFT, FeedbackComposer, FeedbackList, isDraftDirty } from "@/components/feedback";
@@ -31,7 +31,6 @@ export function FeedbackPanel() {
     composerOpen,
     drafts,
     setDraft,
-    openComposer,
     closeComposer,
     addFeedback,
     editFeedback,
@@ -83,7 +82,7 @@ export function FeedbackPanel() {
       ) : null}
 
       <section aria-labelledby="ws-history-title" className="space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+        <div>
           <div>
             <h3 id="ws-history-title" className="text-base font-semibold text-ink">
               היסטוריית משובים
@@ -94,12 +93,6 @@ export function FeedbackPanel() {
               </p>
             ) : null}
           </div>
-          {!composerOpen ? (
-            <Button variant="secondary" size="sm" onClick={openComposer}>
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              משוב חדש
-            </Button>
-          ) : null}
         </div>
 
         {loading.trainee ? (

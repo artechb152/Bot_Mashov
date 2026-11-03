@@ -73,13 +73,6 @@ export function AppShell({
 
   return (
     <div className={cn("lg:flex", fullBleed ? "h-dvh overflow-hidden" : "min-h-dvh")}>
-      <a
-        href="#main"
-        className="sr-only z-[60] rounded-lg bg-surface px-4 py-2 text-sm font-medium text-ink shadow-lg focus:not-sr-only focus:fixed focus:start-3 focus:top-3"
-      >
-        דילוג לתוכן הראשי
-      </a>
-
       <DirectoryFlyout open={directoryOpen} onClose={() => setDirectoryOpen(false)} />
 
       {/* Desktop rail */}

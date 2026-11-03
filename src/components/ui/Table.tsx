@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
  */
 export function Table({ className, ...props }: React.ComponentPropsWithoutRef<"table">) {
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-line">
+    <div className="relative w-full overflow-x-auto rounded-xl border border-line">
       <table className={cn("w-full border-collapse text-start text-sm", className)} {...props} />
     </div>
   );
@@ -28,7 +28,7 @@ export function TR({ className, ...props }: React.ComponentPropsWithoutRef<"tr">
 export function TH({ className, ...props }: React.ComponentPropsWithoutRef<"th">) {
   return (
     <th
-      className={cn("px-4 py-3 text-start text-xs font-semibold tracking-wide text-muted", className)}
+      className={cn("whitespace-nowrap px-4 py-3 text-start text-sm font-semibold text-muted", className)}
       {...props}
     />
   );
