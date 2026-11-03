@@ -1,8 +1,9 @@
-# מצפן — Matzpen
+# חונך+ (codename Matzpen)
 
-A coaching and feedback system for training staff. It helps staff manage trainees and their
-files, and — later — connect to an AI assistant. It is a private, per-user tool: each staff
-member sees and manages only their own trainees, within their own course.
+A coaching and feedback system for training staff. Staff manage trainees, record feedback,
+and work with an AI assistant that drafts reviews and feedback from the feedback they select.
+Each staff member sees and manages only their own trainees, within their own course; managers
+get role-scoped management screens.
 
 The UI is **Hebrew, right-to-left (RTL)**, with a deliberately serious and restrained visual
 design (see [DESIGN.md](DESIGN.md), which is the source of truth for the visual language).
@@ -28,7 +29,10 @@ does not match and returns 404.
 - **Auth** — custom stateless JWT (`jose`) in an httpOnly cookie, `bcryptjs` password hashing
 - **Heebo** Hebrew web font via `next/font`, **lucide-react** icons
 
-No AI SDK is installed and no AI is wired up. The assistant is a UI-only chat.
+- **AI** — a provider abstraction in `src/lib/ai/` (OpenAI, Gemini, a development-only Mock,
+  and a Null provider when nothing is configured), selected by `AI_PROVIDER`. AI output is a
+  draft for staff to review; the server re-derives which feedback enters the context, so the
+  client can never widen it.
 
 ## Getting started
 
@@ -67,6 +71,8 @@ Open http://localhost:3000, then sign up at `/signup`.
 |---|---|
 | `MONGODB_URI` | `src/lib/db/mongoose.ts` and the scripts. Read at call time — the app boots without it. |
 | `SESSION_SECRET` | `src/lib/auth/session.ts` — signs the session JWT (HS256). Any long random string. |
+| `AI_PROVIDER` | `src/lib/ai/index.ts` — `openai`, `gemini` or `mock` (development only). Empty → AI shown as not connected. |
+| `OPENAI_API_KEY`, `OPENAI_MODEL` / `GEMINI_API_KEY`, `GEMINI_MODEL` | Server-only provider credentials. Never exposed to the client. |
 
 The local database is assumed to be a **standalone** MongoDB, so multi-document transactions
 are **not** available. Multi-write flows (the course backfill, the file import) are therefore
@@ -84,23 +90,27 @@ scripts/
 src/
   app/
     layout.tsx           # Root: <html lang="he" dir="rtl">, Heebo, skip-link
-    page.tsx             # Public landing page (outside the app shell)
-    login/  signup/      # Auth screens
+    page.tsx             # Entry: signed in → /workspace, guest → login/signup
     select-course/       # One-time course choice for accounts predating courses
-    (app)/               # Route group: sidebar + topbar shell, requires auth AND a course
+    settings/            # Profile & security
+    (app)/               # Route group: navigation rail shell, requires auth AND a course
+      workspace/         # The work area: trainee rail, review, feedback, AI assistant
       trainees/          # List, create, edit, profile (the trainee file)
-      assistant/         # Bot — UI only, no AI
-      knowledge/         # Redirects to /assistant (kept, but not user-facing)
+      admin/  system/    # Role-scoped management (admin / super-admin)
+      notifications/     # System updates
+      assistant/         # Redirects to /workspace (kept for old links)
     api/
       auth/              # signup, login, logout, course
-      trainees/          # CRUD, attachments, import (preview + create)
-  components/            # ui/ (primitives), layout/, auth/, course/, trainees/, assistant/
+      trainees/          # CRUD, attachments, import, feedback, AI insights
+      feedback/  ai/     # feedback edit/archive; conversations and AI tasks
+  components/            # ui/ (primitives), layout/, workspace/, feedback/, auth/, …
   lib/
-    auth/                # session (JWT), password, current-user, require-scope
+    ai/                  # provider abstraction, context building, schemas
+    auth/                # session (JWT), password, policies, access checks
     course/              # courseConfig.ts — the per-course seam
-    data/                # scope.ts + owner+course-scoped data access
+    data/                # scope.ts + scoped data access
+    hooks/               # client hooks (focus management, unsaved-changes guard, …)
     import/              # parse-trainee-file.ts — dependency-free extraction
-    bot/                 # system prompt + assistant context (staged, not wired to any AI)
   models/                # Mongoose schemas
   middleware.ts          # Edge session guard
 ```
@@ -128,8 +138,7 @@ user to fill the form in by hand. Guessing badly is worse than not guessing.
 
 ## Not included yet
 
-- The AI assistant integration (the chat is UI-only; nothing is sent anywhere or persisted)
-- Rate limiting on login, and session revocation (the JWT is stateless, valid 7 days)
+- Rate limiting on login, and session revocation (the JWT is stateless, valid 7 days).
 
-> The product name **מצפן** ("compass") is a working placeholder — change it in
-> `src/lib/config.ts` to rename it everywhere.
+> The product is presented as **חונך+**; "מצפן" (Matzpen) remains the repository codename.
+> The textual name lives in `src/lib/config.ts`; the visual mark is `BrandWordmark`.
