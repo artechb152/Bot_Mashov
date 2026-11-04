@@ -204,6 +204,9 @@ export function WorkspaceProvider({
 
   const [selectedCohortId, setSelectedCohortId] = useState<string | null>(initialCohortId ?? null);
   const [selectedTraineeId, setSelectedTraineeId] = useState<string | null>(firstValidTrainee);
+  // Async save callbacks must read the current selection, not a stale render.
+  const selectedTraineeIdRef = useRef(selectedTraineeId);
+  selectedTraineeIdRef.current = selectedTraineeId;
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
   const [feedback, setFeedback] = useState<FeedbackDTO[]>([]);
@@ -450,11 +453,12 @@ export function WorkspaceProvider({
   }, []);
 
   const closeComposer = useCallback((traineeId?: string) => {
-    const targetId = traineeId ?? selectedTraineeId;
-    // A save that completes after A → B must never close B's composer.
-    if (!traineeId || traineeId === selectedTraineeId) setComposerRequested(false);
+    const currentId = selectedTraineeIdRef.current;
+    const targetId = traineeId ?? currentId;
+    // An asynchronous save for A must not close B's composer or clear B's draft.
+    if (!traineeId || traineeId === currentId) setComposerRequested(false);
     if (targetId) setDraft(targetId, null);
-  }, [selectedTraineeId, setDraft]);
+  }, [setDraft]);
 
   const rememberColumn = useCallback(
     (open: boolean) => {
