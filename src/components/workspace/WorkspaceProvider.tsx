@@ -206,7 +206,9 @@ export function WorkspaceProvider({
   const [selectedTraineeId, setSelectedTraineeId] = useState<string | null>(firstValidTrainee);
   // Async save callbacks must read the current selection, not a stale render.
   const selectedTraineeIdRef = useRef(selectedTraineeId);
-  selectedTraineeIdRef.current = selectedTraineeId;
+  useEffect(() => {
+    selectedTraineeIdRef.current = selectedTraineeId;
+  }, [selectedTraineeId]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
   const [feedback, setFeedback] = useState<FeedbackDTO[]>([]);
