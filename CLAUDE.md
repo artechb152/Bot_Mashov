@@ -5,6 +5,7 @@ React 19, TypeScript strict, Tailwind CSS v4 (CSS-first tokens in `src/app/globa
 MongoDB/Mongoose, custom JWT auth, Heebo font, lucide-react icons. No shadcn/ui, no Radix,
 no animation library.
 
+- **MANDATORY True RTL contract:** [docs/RTL_POLICY.md](docs/RTL_POLICY.md). Every UI change is RTL by default, including icons, button/icon order, motion, portals and keyboard flow. LTR is permitted only as a reasoned local `rtl-exception:`. Run `npm run check:rtl` (incremental) and manually verify on desktop and mobile; a passing static guard alone does not prove full RTL.
 - Product overview and stack: [README.md](README.md)
 - **Visual language — source of truth: [DESIGN.md](DESIGN.md)** (restrained, monochrome slate,
   operational tool; no emoji, gradients, heavy shadows, decorative badges or showy animation;
