@@ -48,13 +48,15 @@ export function Workspace({
 }
 
 function WorkspaceLayout() {
-  const { mobilePane, assistantOpen, dirtyDraftCount } = useWorkspace();
+  const { mobilePane, assistantOpen, dirtyDraftCount, syncUrl } = useWorkspace();
   // Unsaved feedback drafts survive trainee/cohort switches in memory; leaving the
-  // work area (or reloading) asks first. Cohort links stay on /workspace → no prompt.
+  // work area (link, browser Back or reload) asks first. Cohort links stay on
+  // /workspace → no prompt.
   useUnsavedChangesGuard(
     dirtyDraftCount > 0,
     "יש משוב שעדיין לא נשמר. לעזוב את מרחב העבודה? הטיוטה תימחק.",
     ["/workspace"],
+    syncUrl,
   );
 
   return (

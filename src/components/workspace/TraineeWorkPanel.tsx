@@ -159,7 +159,7 @@ export function TraineeWorkPanel() {
         ) : activeTab === "review" ? (
           <TraineeReview />
         ) : (
-          {/* A feedback-edit dialog must never survive a change of trainee context. */}
+          // A feedback-edit dialog must never survive a change of trainee context.
           <FeedbackPanel key={selectedTrainee.id} />
         )}
       </div>

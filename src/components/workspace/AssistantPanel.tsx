@@ -36,22 +36,20 @@ const SUGGESTIONS: Suggestion[] = [
 type PolishBubble = { id: string; text: string };
 
 /**
- * AI input, proposed polish outputs, and the save dialog are explicitly scoped to
- * the trainee. Keeping this map in memory allows A → B → A without leaking A's
- * notes into B's panel or persisting trainee content in browser storage.
+ * AI input and proposed polish outputs are explicitly scoped to the trainee. Keeping
+ * this map in memory allows A → B → A without leaking A's notes into B's panel or
+ * persisting trainee content in browser storage.
  */
 type AssistantSession = {
   input: string;
   polishBubbles: PolishBubble[];
   polishNote: string | null;
-  saveTarget: string | null;
 };
 
 const EMPTY_ASSISTANT_SESSION: AssistantSession = {
   input: "",
   polishBubbles: [],
   polishNote: null,
-  saveTarget: null,
 };
 
 export function AssistantPanel() {
@@ -78,7 +76,12 @@ export function AssistantPanel() {
   const [sessions, setSessions] = useState<Record<string, AssistantSession>>({});
   const activeTraineeId = selectedTrainee?.id ?? null;
   const session = activeTraineeId ? sessions[activeTraineeId] ?? EMPTY_ASSISTANT_SESSION : EMPTY_ASSISTANT_SESSION;
-  const { input, polishBubbles, polishNote, saveTarget } = session;
+  const { input, polishBubbles, polishNote } = session;
+  // The "save as feedback" dialog belongs to one trainee and closes on any switch;
+  // returning to that trainee must not pop a modal over the view (the result stays).
+  const [saveTarget, setSaveTarget] = useState<{ traineeId: string; text: string } | null>(null);
+  useEffect(() => setSaveTarget(null), [activeTraineeId]);
+  const saveText = saveTarget && saveTarget.traineeId === activeTraineeId ? saveTarget.text : null;
   const scrollRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -117,11 +120,12 @@ export function AssistantPanel() {
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const frame = requestAnimationFrame(() => inputRef.current?.focus());
     const onKey = (e: KeyboardEvent) => {
-      // A modal dialog above the drawer owns Escape.
+      // An open modal dialog above the drawer owns Escape. The phone nav drawer stays
+      // mounted (inert) while closed, so inert dialogs don't count.
       if (
         e.key === "Escape" &&
         panelRef.current?.contains(document.activeElement) &&
-        !document.querySelector("[aria-modal=true]")
+        !document.querySelector("[aria-modal=true]:not([inert])")
       ) {
         closeAssistant();
       }
@@ -171,10 +175,8 @@ export function AssistantPanel() {
         input: previous.input.trim() === text ? "" : previous.input,
       }));
     } else {
-      updateSession(requestTraineeId, (previous) => ({
-        ...previous,
-        polishNote: res.result.message,
-      }));
+      const message = res.result.message;
+      updateSession(requestTraineeId, (previous) => ({ ...previous, polishNote: message }));
     }
   }
 
@@ -279,7 +281,7 @@ export function AssistantPanel() {
               <NoticeBubble key={n.id} notice={n} />
             ))}
             {polishBubbles.map((p) => (
-              <PolishResultBubble key={p.id} text={p.text} onSave={() => patchCurrent({ saveTarget: p.text })} />
+              <PolishResultBubble key={p.id} text={p.text} onSave={() => activeTraineeId && setSaveTarget({ traineeId: activeTraineeId, text: p.text })} />
             ))}
             {polishNote ? (
               <div className="max-w-[90%] self-start rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-muted">{polishNote}</div>
@@ -337,16 +339,16 @@ export function AssistantPanel() {
       </form>
 
       <SavePolishAsFeedbackDialog
-        text={saveTarget}
-        onClose={() => patchCurrent({ saveTarget: null })}
+        text={saveText}
+        onClose={() => setSaveTarget(null)}
         onSave={async (title, text, feedbackType) => {
           const saveTraineeId = activeTraineeId;
           if (!saveTraineeId) return { ok: false, error: "לא נבחר חניך." };
           const result = await addFeedback({ feedbackType, title, rawText: text });
           if (result.ok) {
+            setSaveTarget((current) => (current?.traineeId === saveTraineeId ? null : current));
             updateSession(saveTraineeId, (previous) => ({
               ...previous,
-              saveTarget: null,
               polishBubbles: previous.polishBubbles.filter((p) => p.text !== text),
             }));
           }

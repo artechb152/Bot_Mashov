@@ -138,6 +138,8 @@ export type WorkspaceContextValue = {
   setMobilePane: (pane: MobilePane) => void;
   toggleAssistant: () => void;
   closeAssistant: () => void;
+  /** Re-apply the selection to the current history entry's URL. */
+  syncUrl: () => void;
 
   /** Resolves `{ ok: true }` only once the server confirmed the save. */
   addFeedback: (input: AddFeedbackInput) => Promise<SaveResult>;
@@ -305,15 +307,19 @@ export function WorkspaceProvider({
   }, [selectedCohortId]);
 
   // --- URL sync (shareable ?cohort=&trainee=) --------------------------------
-  useEffect(() => {
+  // Also exposed so the draft guard can re-apply it after a history move lands on an
+  // entry whose URL predates the current selection.
+  const syncUrl = useCallback(() => {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
     if (selectedTraineeId) url.searchParams.set("trainee", selectedTraineeId);
     else url.searchParams.delete("trainee");
     if (selectedCohortId) url.searchParams.set("cohort", selectedCohortId);
     else url.searchParams.delete("cohort");
+    if (url.href === window.location.href) return;
     window.history.replaceState(window.history.state, "", url.toString());
   }, [selectedTraineeId, selectedCohortId]);
+  useEffect(syncUrl, [syncUrl]);
 
   // --- Load a conversation's turns + selection -------------------------------
   const loadConversation = useCallback(
@@ -655,14 +661,17 @@ export function WorkspaceProvider({
   const polish = useCallback(
     async (input: FeedbackPolishInput): Promise<api.PolishResult | null> => {
       if (!selectedTraineeId) return null;
+      const token = loadToken.current;
       patchLoading({ polish: true });
       try {
+        // The caller files the result under the trainee it asked for, even after a switch.
         return await api.polishFeedback(selectedTraineeId, input);
       } catch (err) {
-        handleError(err, "ניסוח המשוב באמצעות AI נכשל.");
+        // A late failure for another trainee must not raise a banner over this one.
+        if (loadToken.current === token) handleError(err, "ניסוח המשוב באמצעות AI נכשל.");
         return null;
       } finally {
-        patchLoading({ polish: false });
+        if (loadToken.current === token) patchLoading({ polish: false });
       }
     },
     [selectedTraineeId, handleError, patchLoading],
@@ -842,6 +851,7 @@ export function WorkspaceProvider({
     setMobilePane,
     toggleAssistant,
     closeAssistant,
+    syncUrl,
     addFeedback,
     editFeedback,
     archiveFeedbackEntry,
