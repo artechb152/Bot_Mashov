@@ -50,8 +50,8 @@ export function FeedbackPanel() {
     const result = await addFeedback(input);
     // Clear only the draft of the trainee it was written for, and only on success.
     if (result.ok) {
-      setDraft(traineeId, null);
-      closeComposer();
+      // The request may have completed after A → B; only A's form may close.
+      closeComposer(traineeId);
     }
     return result;
   }
