@@ -131,7 +131,8 @@ export type WorkspaceContextValue = {
   selectCohort: (id: string | null) => void;
   /** Switch to the feedback view, open the composer and focus its title field. */
   openComposer: () => void;
-  closeComposer: () => void;
+  /** With an explicit origin id, only discard that trainee's draft. */
+  closeComposer: (traineeId?: string) => void;
   dismissError: () => void;
   setActiveTab: (tab: WorkspaceTab) => void;
   setMobilePane: (pane: MobilePane) => void;
@@ -448,9 +449,11 @@ export function WorkspaceProvider({
     });
   }, []);
 
-  const closeComposer = useCallback(() => {
-    setComposerRequested(false);
-    if (selectedTraineeId) setDraft(selectedTraineeId, null);
+  const closeComposer = useCallback((traineeId?: string) => {
+    const targetId = traineeId ?? selectedTraineeId;
+    // A save that completes after A → B must never close B's composer.
+    if (!traineeId || traineeId === selectedTraineeId) setComposerRequested(false);
+    if (targetId) setDraft(targetId, null);
   }, [selectedTraineeId, setDraft]);
 
   const rememberColumn = useCallback(
