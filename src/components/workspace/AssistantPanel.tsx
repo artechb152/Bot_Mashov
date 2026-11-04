@@ -35,6 +35,25 @@ const SUGGESTIONS: Suggestion[] = [
 /** A polish result rendered in the chat with save-as-feedback actions. */
 type PolishBubble = { id: string; text: string };
 
+/**
+ * AI input, proposed polish outputs, and the save dialog are explicitly scoped to
+ * the trainee. Keeping this map in memory allows A → B → A without leaking A's
+ * notes into B's panel or persisting trainee content in browser storage.
+ */
+type AssistantSession = {
+  input: string;
+  polishBubbles: PolishBubble[];
+  polishNote: string | null;
+  saveTarget: string | null;
+};
+
+const EMPTY_ASSISTANT_SESSION: AssistantSession = {
+  input: "",
+  polishBubbles: [],
+  polishNote: null,
+  saveTarget: null,
+};
+
 export function AssistantPanel() {
   const {
     ai,
@@ -56,13 +75,28 @@ export function AssistantPanel() {
     addFeedback,
   } = useWorkspace();
 
-  const [input, setInput] = useState("");
-  const [polishBubbles, setPolishBubbles] = useState<PolishBubble[]>([]);
-  const [polishNote, setPolishNote] = useState<string | null>(null);
-  const [saveTarget, setSaveTarget] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<Record<string, AssistantSession>>({});
+  const activeTraineeId = selectedTrainee?.id ?? null;
+  const session = activeTraineeId ? sessions[activeTraineeId] ?? EMPTY_ASSISTANT_SESSION : EMPTY_ASSISTANT_SESSION;
+  const { input, polishBubbles, polishNote, saveTarget } = session;
   const scrollRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const polishSeq = useRef(0);
+
+  // The ID is captured at call time, including across asynchronous AI requests.
+  // Results from trainee A can only update A's session, even after switching to B.
+  function updateSession(id: string | null, change: (previous: AssistantSession) => AssistantSession) {
+    if (!id) return;
+    setSessions((previous) => ({
+      ...previous,
+      [id]: change(previous[id] ?? EMPTY_ASSISTANT_SESSION),
+    }));
+  }
+
+  function patchCurrent(patch: Partial<AssistantSession>) {
+    updateSession(activeTraineeId, (previous) => ({ ...previous, ...patch }));
+  }
   const polishing = loading.polish;
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const isDrawer = isDesktop && !assistantIsColumn;
@@ -72,17 +106,25 @@ export function AssistantPanel() {
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [turns, notices, polishBubbles, busy]);
+  }, [activeTraineeId, turns, notices, polishBubbles, busy]);
 
-  // Drawer (1024–1535px): focus moves in on open, Escape closes, and focus returns
-  // to the toggle. The column and the phone pane are not overlays, so they don't.
+  // Non-modal drawer (1024–1535px): focus moves in and Escape closes only while
+  // focus is inside the assistant. Tab may return to the review; we deliberately
+  // do NOT trap focus or claim aria-modal, since the review remains interactive.
+  // The column and the phone pane are regular regions, not overlays.
   useEffect(() => {
     if (!isDrawer || !assistantOpen) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const frame = requestAnimationFrame(() => inputRef.current?.focus());
     const onKey = (e: KeyboardEvent) => {
       // A modal dialog above the drawer owns Escape.
-      if (e.key === "Escape" && !document.querySelector("[aria-modal=true]")) closeAssistant();
+      if (
+        e.key === "Escape" &&
+        panelRef.current?.contains(document.activeElement) &&
+        !document.querySelector("[aria-modal=true]")
+      ) {
+        closeAssistant();
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => {
@@ -95,7 +137,7 @@ export function AssistantPanel() {
   function doSend() {
     const text = input.trim();
     if (!text || !selectedTrainee) return;
-    setInput("");
+    patchCurrent({ input: "" });
     void sendChat(text);
   }
 
@@ -105,10 +147,15 @@ export function AssistantPanel() {
   }
 
   async function runPolish() {
+    const requestTraineeId = activeTraineeId;
+    if (!requestTraineeId) return;
     const text = input.trim();
-    setPolishNote(null);
+    updateSession(requestTraineeId, (previous) => ({ ...previous, polishNote: null }));
     if (!text) {
-      setPolishNote("כתבו הערות גולמיות בתיבה, ואז בחרו „ניסוח משוב”.");
+      updateSession(requestTraineeId, (previous) => ({
+        ...previous,
+        polishNote: "כתבו הערות גולמיות בתיבה, ואז בחרו „ניסוח משוב”.",
+      }));
       return;
     }
     const res = await polish({ rawText: text, feedbackType: "other" });
@@ -116,10 +163,18 @@ export function AssistantPanel() {
     if (res.result.status === "ok") {
       polishSeq.current += 1;
       const polished = res.result.output.polishedText;
-      setPolishBubbles((prev) => [...prev, { id: `p${polishSeq.current}`, text: polished }]);
-      setInput("");
+      const resultId = `p${polishSeq.current}`;
+      updateSession(requestTraineeId, (previous) => ({
+        ...previous,
+        polishBubbles: [...previous.polishBubbles, { id: resultId, text: polished }],
+        // Do not wipe edits made while the request was in flight.
+        input: previous.input.trim() === text ? "" : previous.input,
+      }));
     } else {
-      setPolishNote(res.result.message);
+      updateSession(requestTraineeId, (previous) => ({
+        ...previous,
+        polishNote: res.result.message,
+      }));
     }
   }
 
@@ -132,7 +187,7 @@ export function AssistantPanel() {
   const showSuggestions = selectedTrainee && turns.length === 0 && notices.length === 0 && polishBubbles.length === 0;
 
   return (
-    <section className="flex h-full min-h-0 w-full flex-col bg-surface" aria-labelledby="ws-assistant-title">
+    <section ref={panelRef} className="flex h-full min-h-0 w-full flex-col bg-surface" aria-labelledby="ws-assistant-title">
       {/* Header */}
       <div className="flex shrink-0 items-start gap-2 border-b border-line py-3 pe-2 ps-4">
         <div className="min-w-0 flex-1">
@@ -224,7 +279,7 @@ export function AssistantPanel() {
               <NoticeBubble key={n.id} notice={n} />
             ))}
             {polishBubbles.map((p) => (
-              <PolishResultBubble key={p.id} text={p.text} onSave={() => setSaveTarget(p.text)} />
+              <PolishResultBubble key={p.id} text={p.text} onSave={() => patchCurrent({ saveTarget: p.text })} />
             ))}
             {polishNote ? (
               <div className="max-w-[90%] self-start rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-muted">{polishNote}</div>
@@ -248,7 +303,7 @@ export function AssistantPanel() {
           id="ws-assistant-input"
           ref={inputRef}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => patchCurrent({ input: e.target.value })}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
@@ -283,12 +338,17 @@ export function AssistantPanel() {
 
       <SavePolishAsFeedbackDialog
         text={saveTarget}
-        onClose={() => setSaveTarget(null)}
+        onClose={() => patchCurrent({ saveTarget: null })}
         onSave={async (title, text, feedbackType) => {
+          const saveTraineeId = activeTraineeId;
+          if (!saveTraineeId) return { ok: false, error: "לא נבחר חניך." };
           const result = await addFeedback({ feedbackType, title, rawText: text });
           if (result.ok) {
-            setSaveTarget(null);
-            setPolishBubbles((prev) => prev.filter((p) => p.text !== text));
+            updateSession(saveTraineeId, (previous) => ({
+              ...previous,
+              saveTarget: null,
+              polishBubbles: previous.polishBubbles.filter((p) => p.text !== text),
+            }));
           }
           return result;
         }}
