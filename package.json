@@ -27,7 +27,8 @@
     "check:files": "tsx scripts/check-files.ts",
     "check:nav": "tsx scripts/check-nav.ts",
     "reset:dry-run": "tsx scripts/reset-users-and-trainees.ts --dry-run",
-    "reset:execute": "tsx scripts/reset-users-and-trainees.ts --confirm"
+    "reset:execute": "tsx scripts/reset-users-and-trainees.ts --confirm",
+    "check:rtl": "node scripts/check-rtl.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

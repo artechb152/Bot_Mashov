@@ -1,8 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight } from "lucide-react";
-import { buttonClasses } from "@/components/ui";
+import { buttonClasses, NavigationArrow } from "@/components/ui";
 
 /**
  * One reusable "back" control (§17). Priority:
@@ -44,7 +43,7 @@ export function SmartBackButton({
       onClick={goBack}
       className={buttonClasses({ variant: "secondary", size: "sm" }) + (className ? ` ${className}` : "")}
     >
-      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+      <NavigationArrow direction="back" />
       {label}
     </button>
   );
