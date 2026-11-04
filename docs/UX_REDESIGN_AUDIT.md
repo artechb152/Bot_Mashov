@@ -42,11 +42,12 @@ friction · **P2** = consistency / polish.
   Escape closes when focus is inside it, and focus returns to the trigger. Tab is **not**
   trapped; do not represent the drawer as an aria-modal dialog.
 - **Back/forward**: trainee selection still uses `history.replaceState` (no history entry per
-  trainee click). The unsaved-draft guard now adds a same-URL history checkpoint while
-  feedback drafts exist: Back prompts, cancel reinstates the checkpoint, accept continues
-  to the preceding page. On successful save/discard the checkpoint is released. This is
-  a newly added implementation that still needs real Playwright Back/Forward regression
-  testing; it is **not** a universal blocker for arbitrary programmatic router.push calls.
+  trainee click). While feedback drafts exist the guard keeps a same-URL entry on top of a
+  marked base entry. Only landing on the base entry (Back out of the work area) prompts;
+  cancel reinstates the guard and re-syncs the URL to the selected trainee, accept steps
+  past it. Back between in-workspace entries (cohort links) does not prompt. A confirmed
+  link exit and a successful save/discard both step off the guard first, so one Back is
+  enough afterwards. It is **not** a blocker for arbitrary programmatic `router.push`.
 - **Drafts are memory-only**: they survive trainee/tab/cohort switches but not a full reload,
   by design (no personal trainee content in localStorage without a privacy decision).
 - **Archiving a cohort** from the rail now asks for confirmation (reversible, but easy to hit).
@@ -71,6 +72,31 @@ The follow-up implementation includes: per-trainee in-memory assistant sessions 
 polish results, note and save dialog), origin-bound asynchronous polish responses,
 origin-specific feedback form cleanup after delayed save, keyed feedback-edit panels on
 trainee changes, and a same-URL browser-Back draft guard. The assistant drawer is now
-explicitly non-modal. These code changes were reviewed statically via GitHub; they have
-**not yet been verified against the running local application**. Before merging,
-execute the explicit regression scenarios in `docs/MANUAL_ACCEPTANCE_TESTS.md` §32.
+explicitly non-modal.
+
+### §32 verification against the running app (2026-11-04)
+
+Chromium via Playwright, `staff.kapeh.1.test`, the three `[הדגמה]` trainees only, at 1280
+(drawer), 1600 (column) and 390 (phone). `POST /api/ai/tasks/feedback_polish` was answered
+by an in-browser mock with a controllable delay, every other AI POST was stubbed, feedback
+create was mocked (delayable) and feedback edit returned 500 — **no real AI call and no
+database write**. An editable entry was injected into one trainee's feedback list response.
+
+Found and fixed while running §32:
+
+| # | Finding | Fix |
+|---|---|---|
+| R1 | The incoming follow-up did not compile: a JSX comment as the first child of a ternary branch in `TraineeWorkPanel` (TS1005), and a lost narrowing in `AssistantPanel` (TS2339). `/workspace` could not render. | Plain `//` comment; read the message before the closure. |
+| R2 | Back-cancel after switching trainee left the URL on the trainee that was selected when the guard was added (the base entry predates the `replaceState` sync). | The guard calls the provider's `syncUrl` after cancel and after stepping off on save. |
+| R3 | Any popstate prompted — including Back from a cohort link inside `/workspace`, which does not leave the work area. | The entry under the guard is marked; only reaching it prompts. |
+| R4 | After a confirmed link exit, Back returned to the stale guard entry and needed a second Back to leave. | A confirmed exit steps off the guard (`history.back()`), then `router.push`es the target. |
+| R5 | Escape never closed the assistant drawer: the closed phone navigation drawer is always mounted with `aria-modal="true"`, so the "a modal owns Escape" check always matched. | Ignore `[inert]` dialogs. |
+| R6 | Returning to trainee A re-opened A's "save as feedback" modal over the view (on phones, over a different pane). | The dialog closes on any trainee switch and stays closed; the polish result remains in A's session. |
+| R7 | A late polish result/error for A cleared B's busy state or raised a banner over B. | Token-checked like the other provider actions. |
+
+Run with the incoming follow-up hook, R2–R4 reproduce (43/46 checks). After the fixes: 46/46
+at 1280, 39/39 at 1600 and 39/39 at 390 (the drawer checks apply only at 1024–1535). Reload
+or tab close with a draft raises the browser's `beforeunload` prompt. Not covered: Alt+Left as
+a real key chord (identical to `history.back()` in automation), Safari/Firefox, real devices,
+and switching between two real cohorts (the test account has one; the in-workspace Back case
+was exercised with a cohort-link entry instead).
