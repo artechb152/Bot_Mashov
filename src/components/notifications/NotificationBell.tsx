@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
+import { cn } from "@/lib/cn";
 import { NotificationPopover } from "./NotificationPopover";
 
 /**
@@ -12,7 +13,15 @@ import { NotificationPopover } from "./NotificationPopover";
  * Escape, and a second bell click all close it. The unread count polls every 60s
  * (no WebSockets/push) and re-syncs when the popover closes.
  */
-export function NotificationBell() {
+/** Shared row style for first-level items in the dark navigation rail. */
+export const RAIL_ITEM =
+  "flex h-10 w-full items-center gap-3 rounded-lg px-3 text-start text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-rail-ink";
+
+/**
+ * `variant="rail"` renders a full-width "עדכונים" row for the sidebar; the default is
+ * the compact icon button used in the phone top bar.
+ */
+export function NotificationBell({ variant = "icon" }: { variant?: "icon" | "rail" }) {
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -59,25 +68,48 @@ export function NotificationBell() {
     };
   }, [open, close]);
 
+  const label = unread > 0 ? `עדכונים (${unread} חדשים)` : "עדכונים";
+  const count = unread > 99 ? "99+" : String(unread);
+
   return (
     <>
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-label={unread > 0 ? `התראות (${unread} חדשות)` : "התראות"}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        title="התראות"
-        className="relative grid h-9 w-9 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15"
-      >
-        <Bell className="h-4 w-4" aria-hidden="true" />
-        {unread > 0 ? (
-          <span className="absolute -end-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-4 text-white">
-            {unread > 99 ? "99+" : unread}
-          </span>
-        ) : null}
-      </button>
+      {variant === "rail" ? (
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-label={label}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          className={cn(RAIL_ITEM, open ? "bg-rail-active text-rail-ink" : "text-rail-ink/90 hover:bg-rail-hover hover:text-rail-ink")}
+        >
+          <Bell className="h-5 w-5 shrink-0 text-rail-muted" aria-hidden="true" />
+          <span className="flex-1">עדכונים</span>
+          {unread > 0 ? (
+            <span className="grid h-5 min-w-5 place-items-center rounded-full bg-rail-ink px-1.5 text-xs font-semibold tabular-nums text-rail" aria-hidden="true">
+              {count}
+            </span>
+          ) : null}
+        </button>
+      ) : (
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-label={label}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          title="עדכונים"
+          className="relative grid h-10 w-10 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          <Bell className="h-5 w-5" aria-hidden="true" />
+          {unread > 0 ? (
+            <span className="absolute end-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.6875rem] font-semibold leading-none tabular-nums text-white" aria-hidden="true">
+              {count}
+            </span>
+          ) : null}
+        </button>
+      )}
       {open ? (
         <NotificationPopover anchorRef={buttonRef} panelRef={panelRef} onNavigate={() => setOpen(false)} />
       ) : null}

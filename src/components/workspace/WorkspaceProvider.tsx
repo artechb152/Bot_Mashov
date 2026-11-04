@@ -12,6 +12,8 @@ import {
 import * as api from "@/lib/workspace/api";
 import { ApiError } from "@/lib/workspace/api";
 import { NO_COHORT, traineeMatchesCohort } from "@/lib/workspace/nav";
+import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
+import { isDraftDirty, type FeedbackDraft, type SaveResult } from "@/components/feedback/FeedbackComposer";
 import type { TraineeDTO } from "@/lib/data/trainees";
 import type { FeedbackDTO, FeedbackInput } from "@/lib/data/feedback";
 import type { InsightDTO } from "@/lib/data/ai-insights";
@@ -43,8 +45,15 @@ export type ChatNotice = {
 
 export type AIStatus = { configured: boolean; mock: boolean; provider: string; category: string };
 
-/** Central work-area tab (one visible at a time). */
-export type WorkspaceTab = "overview" | "timeline" | "final";
+/** The selected trainee's two views: the single review document, and the feedback
+ *  history (with the composer and the AI-source selection). */
+export type WorkspaceTab = "review" | "feedback";
+
+/** Below the `lg` breakpoint only one zone is visible at a time. */
+export type MobilePane = "list" | "trainee" | "assistant";
+
+/** The assistant is a persistent column from this width up (a drawer below it). */
+const ASSISTANT_COLUMN_QUERY = "(min-width: 1536px)";
 
 /** Feedback creation input — text and/or an uploaded file. */
 export type AddFeedbackInput = {
@@ -62,6 +71,7 @@ type WorkspaceLoading = {
   task: AIArtifactTask | null;
   feedback: boolean;
   archived: boolean;
+  polish: boolean;
 };
 
 export type WorkspaceContextValue = {
@@ -74,7 +84,6 @@ export type WorkspaceContextValue = {
   selectedCohortId: string | null;
   selectedTraineeId: string | null;
   selectedTrainee: TraineeDTO | null;
-  expandedTraineeId: string | null;
   activeConversationId: string | null;
 
   // Data for the selected trainee ---------------------------------------------
@@ -102,18 +111,39 @@ export type WorkspaceContextValue = {
   traineeAccessError: "forbidden" | "notfound" | null;
   showArchived: boolean;
   composerFocusSignal: number;
+  composerOpen: boolean;
   activeTab: WorkspaceTab;
+  mobilePane: MobilePane;
+  /** Whether the assistant is shown in the current layout (column or drawer). */
+  assistantOpen: boolean;
+  /** True from 1536px up, where the assistant is a column rather than a drawer. */
+  assistantIsColumn: boolean;
+  /** Any assistant request in flight (chat, task, polish) — drives the busy marker. */
+  assistantBusy: boolean;
+
+  // Unsaved feedback drafts, per trainee (memory only — never persisted) -------
+  drafts: Readonly<Record<string, FeedbackDraft>>;
+  dirtyDraftCount: number;
+  setDraft: (traineeId: string, draft: FeedbackDraft | null) => void;
 
   // Actions -------------------------------------------------------------------
   selectTrainee: (id: string | null) => void;
   selectCohort: (id: string | null) => void;
-  toggleExpand: (id: string) => void;
-  requestComposerFocus: () => void;
+  /** Switch to the feedback view, open the composer and focus its title field. */
+  openComposer: () => void;
+  /** With an explicit origin id, only discard that trainee's draft. */
+  closeComposer: (traineeId?: string) => void;
   dismissError: () => void;
   setActiveTab: (tab: WorkspaceTab) => void;
+  setMobilePane: (pane: MobilePane) => void;
+  toggleAssistant: () => void;
+  closeAssistant: () => void;
+  /** Re-apply the selection to the current history entry's URL. */
+  syncUrl: () => void;
 
-  addFeedback: (input: AddFeedbackInput) => Promise<boolean>;
-  editFeedback: (id: string, input: Partial<FeedbackInput>) => Promise<boolean>;
+  /** Resolves `{ ok: true }` only once the server confirmed the save. */
+  addFeedback: (input: AddFeedbackInput) => Promise<SaveResult>;
+  editFeedback: (id: string, input: Partial<FeedbackInput>) => Promise<SaveResult>;
   archiveFeedbackEntry: (id: string) => Promise<void>;
   restoreFeedbackEntry: (id: string) => Promise<void>;
   setShowArchived: (show: boolean) => void;
@@ -176,7 +206,11 @@ export function WorkspaceProvider({
 
   const [selectedCohortId, setSelectedCohortId] = useState<string | null>(initialCohortId ?? null);
   const [selectedTraineeId, setSelectedTraineeId] = useState<string | null>(firstValidTrainee);
-  const [expandedTraineeId, setExpandedTraineeId] = useState<string | null>(firstValidTrainee);
+  // Async save callbacks must read the current selection, not a stale render.
+  const selectedTraineeIdRef = useRef(selectedTraineeId);
+  useEffect(() => {
+    selectedTraineeIdRef.current = selectedTraineeId;
+  }, [selectedTraineeId]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
   const [feedback, setFeedback] = useState<FeedbackDTO[]>([]);
@@ -193,12 +227,30 @@ export function WorkspaceProvider({
     task: null,
     feedback: false,
     archived: false,
+    polish: false,
   });
   const [error, setError] = useState<string | null>(null);
   const [traineeAccessError, setTraineeAccessError] = useState<"forbidden" | "notfound" | null>(null);
   const [showArchived, setShowArchivedState] = useState(false);
   const [composerFocusSignal, setComposerFocusSignal] = useState(0);
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>("overview");
+  const [composerRequested, setComposerRequested] = useState(false);
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("review");
+  const [mobilePane, setMobilePane] = useState<MobilePane>(firstValidTrainee ? "trainee" : "list");
+  const [drafts, setDrafts] = useState<Record<string, FeedbackDraft>>({});
+
+  // Assistant visibility: a column the user may hide (>=1536px, remembered per
+  // browser as a UI preference) or a drawer that starts closed (1024–1535px).
+  const assistantIsColumn = useMediaQuery(ASSISTANT_COLUMN_QUERY);
+  const [assistantColumnOpen, setAssistantColumnOpen] = useState(true);
+  const [assistantDrawerOpen, setAssistantDrawerOpen] = useState(false);
+  const columnPrefKey = `chp:ws:asst:column:${username}`;
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(columnPrefKey) === "0") setAssistantColumnOpen(false);
+    } catch {
+      /* storage unavailable — keep the default */
+    }
+  }, [columnPrefKey]);
 
   // Ignore responses from a trainee that is no longer selected (fast switching).
   const loadToken = useRef(0);
@@ -255,15 +307,19 @@ export function WorkspaceProvider({
   }, [selectedCohortId]);
 
   // --- URL sync (shareable ?cohort=&trainee=) --------------------------------
-  useEffect(() => {
+  // Also exposed so the draft guard can re-apply it after a history move lands on an
+  // entry whose URL predates the current selection.
+  const syncUrl = useCallback(() => {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
     if (selectedTraineeId) url.searchParams.set("trainee", selectedTraineeId);
     else url.searchParams.delete("trainee");
     if (selectedCohortId) url.searchParams.set("cohort", selectedCohortId);
     else url.searchParams.delete("cohort");
+    if (url.href === window.location.href) return;
     window.history.replaceState(window.history.state, "", url.toString());
   }, [selectedTraineeId, selectedCohortId]);
+  useEffect(syncUrl, [syncUrl]);
 
   // --- Load a conversation's turns + selection -------------------------------
   const loadConversation = useCallback(
@@ -290,7 +346,7 @@ export function WorkspaceProvider({
   const loadTrainee = useCallback(
     async (traineeId: string) => {
       const token = ++loadToken.current;
-      setLoading({ trainee: true, conversation: false, sending: false, task: null, feedback: false, archived: false });
+      setLoading({ trainee: true, conversation: false, sending: false, task: null, feedback: false, archived: false, polish: false });
       setTraineeAccessError(null);
       setError(null);
       setFeedback([]);
@@ -379,19 +435,68 @@ export function WorkspaceProvider({
   // --- Selection actions -----------------------------------------------------
   const selectTrainee = useCallback((id: string | null) => {
     setSelectedTraineeId(id);
-    setExpandedTraineeId(id);
+    setComposerRequested(false);
+    if (id) setMobilePane("trainee");
   }, []);
 
   const selectCohort = useCallback((id: string | null) => setSelectedCohortId(id), []);
 
-  const toggleExpand = useCallback((id: string) => {
-    setExpandedTraineeId((prev) => (prev === id ? null : id));
+  const openComposer = useCallback(() => {
+    setActiveTab("feedback");
+    setComposerRequested(true);
+    setMobilePane("trainee");
+    setComposerFocusSignal((n) => n + 1);
   }, []);
 
-  const requestComposerFocus = useCallback(() => {
-    setExpandedTraineeId(selectedTraineeId);
-    setComposerFocusSignal((n) => n + 1);
-  }, [selectedTraineeId]);
+  const setDraft = useCallback((traineeId: string, draft: FeedbackDraft | null) => {
+    setDrafts((prev) => {
+      if (!draft) {
+        if (!(traineeId in prev)) return prev;
+        const next = { ...prev };
+        delete next[traineeId];
+        return next;
+      }
+      return { ...prev, [traineeId]: draft };
+    });
+  }, []);
+
+  const closeComposer = useCallback((traineeId?: string) => {
+    const currentId = selectedTraineeIdRef.current;
+    const targetId = traineeId ?? currentId;
+    // An asynchronous save for A must not close B's composer or clear B's draft.
+    if (!traineeId || traineeId === currentId) setComposerRequested(false);
+    if (targetId) setDraft(targetId, null);
+  }, [setDraft]);
+
+  const rememberColumn = useCallback(
+    (open: boolean) => {
+      try {
+        localStorage.setItem(columnPrefKey, open ? "1" : "0");
+      } catch {
+        /* ignore persistence failures */
+      }
+    },
+    [columnPrefKey],
+  );
+
+  const toggleAssistant = useCallback(() => {
+    if (assistantIsColumn) {
+      const next = !assistantColumnOpen;
+      setAssistantColumnOpen(next);
+      rememberColumn(next);
+    } else {
+      setAssistantDrawerOpen((open) => !open);
+    }
+  }, [assistantIsColumn, assistantColumnOpen, rememberColumn]);
+
+  const closeAssistant = useCallback(() => {
+    if (assistantIsColumn) {
+      setAssistantColumnOpen(false);
+      rememberColumn(false);
+    } else {
+      setAssistantDrawerOpen(false);
+    }
+  }, [assistantIsColumn, rememberColumn]);
 
   const dismissError = useCallback(() => setError(null), []);
 
@@ -405,30 +510,47 @@ export function WorkspaceProvider({
   }, []);
 
   // --- Ensure an active conversation exists (create on demand) ----------------
-  const ensureConversation = useCallback(async (): Promise<ConversationDTO | null> => {
+  // `token` is the caller's loadToken, captured BEFORE this await. If the user has moved
+  // to another trainee meanwhile, the conversation still belongs to the original trainee
+  // (the caller may finish its server call), but nothing is written to the visible state.
+  const ensureConversation = useCallback(async (token: number): Promise<ConversationDTO | null> => {
     if (!selectedTraineeId) return null;
     if (activeConversation) return activeConversation;
     try {
       const conv = await api.createConversation(selectedTraineeId);
-      setConversations((prev) => [conv, ...prev]);
-      setActiveConversationId(conv.id);
-      setTurns([]);
-      setNotices([]);
+      if (loadToken.current === token) {
+        setConversations((prev) => [conv, ...prev]);
+        setActiveConversationId(conv.id);
+        setTurns([]);
+        setNotices([]);
+      }
       return conv;
     } catch (err) {
-      const isAccess = handleError(err, "פתיחת שיחה חדשה נכשלה.");
-      if (isAccess) setTraineeAccessError("notfound");
+      if (loadToken.current === token) {
+        const isAccess = handleError(err, "פתיחת שיחה חדשה נכשלה.");
+        if (isAccess) setTraineeAccessError("notfound");
+      }
       return null;
     }
   }, [selectedTraineeId, activeConversation, handleError]);
 
   // --- Feedback actions ------------------------------------------------------
+  // Feedback saves report their failure to the form that started them (inline,
+  // next to the preserved content) instead of the page-level banner.
+  const saveErrorMessage = useCallback((err: unknown, fallback: string, forbidden: string): string => {
+    if (err instanceof ApiError) {
+      if (err.status === 401) return "פג תוקף ההתחברות. התחברו מחדש בלשונית אחרת ונסו שוב.";
+      if (err.status === 403 || err.status === 404) return forbidden;
+      return err.message || fallback;
+    }
+    return fallback;
+  }, []);
+
   const addFeedback = useCallback(
-    async (input: AddFeedbackInput): Promise<boolean> => {
-      if (!selectedTraineeId) return false;
+    async (input: AddFeedbackInput): Promise<SaveResult> => {
+      if (!selectedTraineeId) return { ok: false, error: "לא נבחר חניך." };
       const token = loadToken.current;
       patchLoading({ feedback: true });
-      setError(null);
       try {
         const created = input.file
           ? await api.createFeedbackWithFile(
@@ -442,7 +564,7 @@ export function WorkspaceProvider({
               rawText: input.rawText,
               selectedAction: input.selectedAction,
             });
-        if (loadToken.current !== token) return true;
+        if (loadToken.current !== token) return { ok: true };
         setFeedback((prev) => [...prev, created]);
         // A new source: add it to the active conversation's selection so it is used.
         if (activeConversation) {
@@ -458,36 +580,31 @@ export function WorkspaceProvider({
         }
         // The new source makes existing artifacts incomplete → server marked them stale.
         await refreshInsights(selectedTraineeId, token);
-        return true;
+        return { ok: true };
       } catch (err) {
-        const isAccess = handleError(err, "שמירת המשוב נכשלה.");
-        if (isAccess) setError("אין לך הרשאה להוסיף משוב לחניך זה.");
-        return false;
+        return { ok: false, error: saveErrorMessage(err, "שמירת המשוב נכשלה.", "אין לך הרשאה להוסיף משוב לחניך זה.") };
       } finally {
         if (loadToken.current === token) patchLoading({ feedback: false });
       }
     },
-    [selectedTraineeId, activeConversation, handleError, patchLoading, refreshInsights],
+    [selectedTraineeId, activeConversation, saveErrorMessage, patchLoading, refreshInsights],
   );
 
   const editFeedback = useCallback(
-    async (id: string, input: Partial<FeedbackInput>): Promise<boolean> => {
-      if (!selectedTraineeId) return false;
+    async (id: string, input: Partial<FeedbackInput>): Promise<SaveResult> => {
+      if (!selectedTraineeId) return { ok: false, error: "לא נבחר חניך." };
       const token = loadToken.current;
-      setError(null);
       try {
         const updated = await api.updateFeedback(id, input);
-        if (loadToken.current !== token) return true;
+        if (loadToken.current !== token) return { ok: true };
         setFeedback((prev) => prev.map((f) => (f.id === id ? updated : f)));
         await refreshInsights(selectedTraineeId, token);
-        return true;
+        return { ok: true };
       } catch (err) {
-        const isAccess = handleError(err, "עדכון המשוב נכשל.");
-        if (isAccess) setError("אין לך הרשאה לערוך משוב זה.");
-        return false;
+        return { ok: false, error: saveErrorMessage(err, "עדכון המשוב נכשל.", "אין לך הרשאה לערוך משוב זה.") };
       }
     },
-    [selectedTraineeId, handleError, refreshInsights],
+    [selectedTraineeId, saveErrorMessage, refreshInsights],
   );
 
   const archiveFeedbackEntry = useCallback(
@@ -551,31 +668,45 @@ export function WorkspaceProvider({
   const polish = useCallback(
     async (input: FeedbackPolishInput): Promise<api.PolishResult | null> => {
       if (!selectedTraineeId) return null;
+      const token = loadToken.current;
+      patchLoading({ polish: true });
       try {
+        // The caller files the result under the trainee it asked for, even after a switch.
         return await api.polishFeedback(selectedTraineeId, input);
       } catch (err) {
-        handleError(err, "ניסוח המשוב באמצעות AI נכשל.");
+        // A late failure for another trainee must not raise a banner over this one.
+        if (loadToken.current === token) handleError(err, "ניסוח המשוב באמצעות AI נכשל.");
         return null;
+      } finally {
+        if (loadToken.current === token) patchLoading({ polish: false });
       }
     },
-    [selectedTraineeId, handleError],
+    [selectedTraineeId, handleError, patchLoading],
   );
 
   // --- Source selection ------------------------------------------------------
   const toggleSource = useCallback(
     async (feedbackId: string, checked: boolean) => {
-      const conv = await ensureConversation();
+      const token = loadToken.current;
+      const conv = await ensureConversation(token);
       if (!conv) return;
       const current = new Set(conv.selectedFeedbackIds);
       if (checked) current.add(feedbackId);
       else current.delete(feedbackId);
       const next = Array.from(current);
       // Optimistic — reflect the toggle immediately, reconcile with the server result.
-      setConversations((prev) => prev.map((c) => (c.id === conv.id ? { ...c, selectedFeedbackIds: next } : c)));
+      // After a trainee switch the server call still completes for the original trainee,
+      // but the visible state belongs to someone else and is left alone.
+      if (loadToken.current === token) {
+        setConversations((prev) => prev.map((c) => (c.id === conv.id ? { ...c, selectedFeedbackIds: next } : c)));
+      }
       try {
         const updated = await api.updateConversation(conv.id, { selectedFeedbackIds: next });
-        setConversations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+        if (loadToken.current === token) {
+          setConversations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+        }
       } catch (err) {
+        if (loadToken.current !== token) return;
         // Roll back the optimistic change.
         setConversations((prev) => prev.map((c) => (c.id === conv.id ? conv : c)));
         handleError(err, "עדכון בחירת המקורות נכשל.");
@@ -595,13 +726,17 @@ export function WorkspaceProvider({
 
   const startNewConversation = useCallback(async () => {
     if (!selectedTraineeId) return;
+    const token = loadToken.current;
     try {
       const conv = await api.createConversation(selectedTraineeId);
+      // Created for the original trainee; never shown under another one.
+      if (loadToken.current !== token) return;
       setConversations((prev) => [conv, ...prev]);
       setActiveConversationId(conv.id);
       setTurns([]);
       setNotices([]);
     } catch (err) {
+      if (loadToken.current !== token) return;
       const isAccess = handleError(err, "פתיחת שיחה חדשה נכשלה.");
       if (isAccess) setTraineeAccessError("notfound");
     }
@@ -628,10 +763,14 @@ export function WorkspaceProvider({
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
-      const conv = await ensureConversation();
-      if (!conv) return;
+      // Captured before any await: every later state write is tied to this trainee.
       const token = loadToken.current;
-      patchLoading({ sending: true });
+      const conv = await ensureConversation(token);
+      if (!conv) return;
+      // Navigated away while the conversation was being created: still deliver the
+      // message to the original trainee's conversation, without touching this view.
+      const visible = loadToken.current === token;
+      if (visible) patchLoading({ sending: true });
       try {
         const res = await api.sendMessage(conv.id, trimmed);
         if (loadToken.current !== token) return;
@@ -645,10 +784,11 @@ export function WorkspaceProvider({
         if (res.result.status === "not_configured") pushNotice("not_configured", res.result.message);
         else if (res.result.status === "error") pushNotice("error", res.result.message);
       } catch (err) {
+        if (loadToken.current !== token) return;
         const isAccess = handleError(err, "שליחת ההודעה נכשלה.");
         if (isAccess) setError("אין לך הרשאה לשלוח הודעה בשיחה זו.");
       } finally {
-        if (loadToken.current === token) patchLoading({ sending: false });
+        if (visible && loadToken.current === token) patchLoading({ sending: false });
       }
     },
     [ensureConversation, patchLoading, pushNotice, handleError],
@@ -676,6 +816,7 @@ export function WorkspaceProvider({
           pushNotice("error", res.result.message);
         }
       } catch (err) {
+        if (loadToken.current !== token) return;
         const isAccess = handleError(err, "הרצת המשימה נכשלה.");
         if (isAccess) setError("אין לך הרשאה להריץ משימה זו.");
       } finally {
@@ -685,6 +826,11 @@ export function WorkspaceProvider({
     [selectedTraineeId, activeConversationId, selectedFeedbackIdSet, patchLoading, pushNotice, refreshInsights, handleError],
   );
 
+  const dirtyDraftCount = useMemo(() => Object.values(drafts).filter(isDraftDirty).length, [drafts]);
+  const composerOpen = composerRequested || Boolean(selectedTraineeId && isDraftDirty(drafts[selectedTraineeId]));
+  const assistantOpen = assistantIsColumn ? assistantColumnOpen : assistantDrawerOpen;
+  const assistantBusy = loading.sending || loading.task !== null || loading.polish;
+
   const value: WorkspaceContextValue = {
     trainees,
     username,
@@ -692,7 +838,6 @@ export function WorkspaceProvider({
     selectedCohortId,
     selectedTraineeId,
     selectedTrainee,
-    expandedTraineeId,
     activeConversationId,
     feedback,
     archivedFeedback,
@@ -713,13 +858,25 @@ export function WorkspaceProvider({
     traineeAccessError,
     showArchived,
     composerFocusSignal,
+    composerOpen,
     activeTab,
+    mobilePane,
+    assistantOpen,
+    assistantIsColumn,
+    assistantBusy,
+    drafts,
+    dirtyDraftCount,
+    setDraft,
     selectTrainee,
     selectCohort,
-    toggleExpand,
-    requestComposerFocus,
+    openComposer,
+    closeComposer,
     dismissError,
     setActiveTab,
+    setMobilePane,
+    toggleAssistant,
+    closeAssistant,
+    syncUrl,
     addFeedback,
     editFeedback,
     archiveFeedbackEntry,

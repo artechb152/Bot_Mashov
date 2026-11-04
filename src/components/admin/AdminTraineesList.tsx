@@ -64,8 +64,8 @@ export function AdminTraineesList({
           <THead>
             <TR>
               <TH>שם החניך</TH>
-              <TH>מפקד מלווה</TH>
-              <TH>סטטוס</TH>
+              <TH className="hidden sm:table-cell">מפקד מלווה</TH>
+              <TH className="hidden sm:table-cell">סטטוס</TH>
               <TH><span className="sr-only">פעולות</span></TH>
             </TR>
           </THead>
@@ -73,10 +73,13 @@ export function AdminTraineesList({
             {rows.map((t) => (
               <TR key={t.id}>
                 <TD className="font-medium">
-                  <Link href={`/admin/trainees/${t.id}`} className="hover:underline">{t.fullName}</Link>
+                  <Link href={`/admin/trainees/${t.id}`} className="hover:underline" dir="auto">{t.fullName}</Link>
+                  <span className="block text-sm font-normal text-muted sm:hidden">
+                    {ownerLabels[t.ownerId] ?? "—"} · {t.status === "archived" ? "בארכיון" : "פעיל"}
+                  </span>
                 </TD>
-                <TD className="text-muted">{ownerLabels[t.ownerId] ?? "—"}</TD>
-                <TD className="text-muted">{t.status === "archived" ? "בארכיון" : "פעיל"}</TD>
+                <TD className="hidden text-muted sm:table-cell">{ownerLabels[t.ownerId] ?? "—"}</TD>
+                <TD className="hidden text-muted sm:table-cell">{t.status === "archived" ? "בארכיון" : "פעיל"}</TD>
                 <TD className="text-end">
                   <Button variant="ghost" size="sm" onClick={() => { setTransferFor(t); setError(null); }}>
                     העברת בעלות

@@ -34,7 +34,7 @@ function KnowledgeCard({ doc }: { doc: KnowledgeDocDTO }) {
   return (
     <Link
       href={`/knowledge/${doc.slug}`}
-      className="group block rounded-xl border border-line bg-surface p-5 transition-colors hover:border-line-strong hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+      className="group block rounded-xl border border-line bg-surface p-5 transition-colors hover:border-line-strong hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
     >
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-semibold text-ink group-hover:underline">{doc.title}</h3>

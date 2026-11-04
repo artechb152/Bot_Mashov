@@ -153,7 +153,7 @@ export function TraineeAttachments({
               </div>
               <a
                 href={`${apiBase}/${traineeId}/attachments/${att.id}`}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-subtle transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-subtle transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 aria-label={`הורדת ${att.originalName}`}
               >
                 <Download className="h-4 w-4" aria-hidden="true" />
@@ -162,7 +162,7 @@ export function TraineeAttachments({
                 <button
                   type="button"
                   onClick={() => handleDelete(att)}
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-subtle transition-colors hover:bg-red-50 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-subtle transition-colors hover:bg-red-50 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                   aria-label={`מחיקת ${att.originalName}`}
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />

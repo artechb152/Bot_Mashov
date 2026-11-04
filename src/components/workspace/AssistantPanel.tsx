@@ -1,49 +1,59 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Plus, Send, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown, Loader2, Plus, Send, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { Button, Dialog, Field, Input, Textarea } from "@/components/ui";
+import { Button, Dialog, Field, Input, Select, Textarea } from "@/components/ui";
 import { KnowledgeMarkdown } from "@/components/knowledge/KnowledgeMarkdown";
+import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
+import type { SaveResult } from "@/components/feedback";
 import { useWorkspace, type ChatNotice } from "./WorkspaceProvider";
 import { FEEDBACK_TYPES, FEEDBACK_TYPE_LABELS, type FeedbackType } from "@/lib/domain/types";
 import type { AIArtifactTask } from "@/lib/ai/types";
 import type { TurnDTO } from "@/lib/data/conversations";
 
 /**
- * Bottom zone: a persistent (non-modal), collapsible + vertically-resizable assistant
- * panel wired to the Stage 2 chat/task APIs. Shows the active trainee + selected-source
+ * The assistant — a support tool beside the review, never the main surface. The same
+ * instance renders as a column (>=1536px), a drawer over the review (1024–1535px) or
+ * its own pane on phones (see Workspace). Shows the linked trainee + selected-source
  * count, a conversation switcher, opening suggestions, and — in development with the
  * Mock provider — a clear "מצב פיתוח · Mock" marker. It never renders a fabricated
- * answer: a not-configured/error result is shown as an explicit notice, not a bot reply.
+ * answer: a not-configured/error result is shown as an explicit notice, not a reply.
  */
-
-const MIN_HEIGHT = 180;
-const DEFAULT_HEIGHT = 300;
 
 type Suggestion =
   | { label: string; kind: "task"; task: AIArtifactTask }
   | { label: string; kind: "polish" };
 
-// A slim set of the core actions (no scattered chips). The review is a single product
-// ("הפק סקירה") rather than separate timeline/final-evaluation buttons.
+// A slim set of the core actions. The review is a single product ("הפקת סקירה").
 const SUGGESTIONS: Suggestion[] = [
-  { label: "נסח משוב", kind: "polish" },
-  { label: "הפק סקירה", kind: "task", task: "trainee_overview" },
-  { label: "סכם משובים", kind: "task", task: "feedback_summary" },
+  { label: "ניסוח משוב", kind: "polish" },
+  { label: "הפקת סקירה", kind: "task", task: "trainee_overview" },
+  { label: "סיכום משובים", kind: "task", task: "feedback_summary" },
 ];
 
 /** A polish result rendered in the chat with save-as-feedback actions. */
 type PolishBubble = { id: string; text: string };
 
-function storageKey(username: string, part: string): string {
-  return `chp:ws:asst:${part}:${username}`;
-}
+/**
+ * AI input and proposed polish outputs are explicitly scoped to the trainee. Keeping
+ * this map in memory allows A → B → A without leaking A's notes into B's panel or
+ * persisting trainee content in browser storage.
+ */
+type AssistantSession = {
+  input: string;
+  polishBubbles: PolishBubble[];
+  polishNote: string | null;
+};
+
+const EMPTY_ASSISTANT_SESSION: AssistantSession = {
+  input: "",
+  polishBubbles: [],
+  polishNote: null,
+};
 
 export function AssistantPanel() {
-  const ws = useWorkspace();
   const {
-    username,
     ai,
     selectedTrainee,
     conversations,
@@ -52,128 +62,86 @@ export function AssistantPanel() {
     notices,
     selectedSourceCount,
     loading,
+    assistantOpen,
+    assistantIsColumn,
+    closeAssistant,
     selectConversation,
     startNewConversation,
     sendChat,
     runTask,
     polish,
     addFeedback,
-  } = ws;
+  } = useWorkspace();
 
-  const [collapsed, setCollapsed] = useState(false);
-  const [height, setHeight] = useState(DEFAULT_HEIGHT);
-  // Wide (lg+) → the panel is a narrow LEFT column filling the row height; narrow → a
-  // stacked, vertically-resizable strip below the work area. Vertical resize only
-  // applies to the stacked layout (a side column takes its height from the row).
-  const [isWide, setIsWide] = useState(false);
-  const [input, setInput] = useState("");
-  const [hydrated, setHydrated] = useState(false);
-  const [polishBubbles, setPolishBubbles] = useState<PolishBubble[]>([]);
-  const [polishing, setPolishing] = useState(false);
-  const [polishNote, setPolishNote] = useState<string | null>(null);
-  const [saveTarget, setSaveTarget] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<Record<string, AssistantSession>>({});
+  const activeTraineeId = selectedTrainee?.id ?? null;
+  const session = activeTraineeId ? sessions[activeTraineeId] ?? EMPTY_ASSISTANT_SESSION : EMPTY_ASSISTANT_SESSION;
+  const { input, polishBubbles, polishNote } = session;
+  // The "save as feedback" dialog belongs to one trainee and closes on any switch;
+  // returning to that trainee must not pop a modal over the view (the result stays).
+  const [saveTarget, setSaveTarget] = useState<{ traineeId: string; text: string } | null>(null);
+  useEffect(() => setSaveTarget(null), [activeTraineeId]);
+  const saveText = saveTarget && saveTarget.traineeId === activeTraineeId ? saveTarget.text : null;
   const scrollRef = useRef<HTMLDivElement>(null);
-  const dragState = useRef<{ startY: number; startHeight: number } | null>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const polishSeq = useRef(0);
 
-  // Restore persisted height/collapsed (per user).
-  useEffect(() => {
-    try {
-      const h = Number(localStorage.getItem(storageKey(username, "h")));
-      if (Number.isFinite(h) && h >= MIN_HEIGHT) setHeight(h);
-      setCollapsed(localStorage.getItem(storageKey(username, "collapsed")) === "1");
-    } catch {
-      /* localStorage may be unavailable — fall back to defaults */
-    }
-    setHydrated(true);
-  }, [username]);
+  // The ID is captured at call time, including across asynchronous AI requests.
+  // Results from trainee A can only update A's session, even after switching to B.
+  function updateSession(id: string | null, change: (previous: AssistantSession) => AssistantSession) {
+    if (!id) return;
+    setSessions((previous) => ({
+      ...previous,
+      [id]: change(previous[id] ?? EMPTY_ASSISTANT_SESSION),
+    }));
+  }
 
-  // Track the lg breakpoint (matches Tailwind's `lg`, 1024px) to switch layout mode.
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const apply = () => setIsWide(mq.matches);
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
-  }, []);
-
-  const persist = useCallback(
-    (next: { height?: number; collapsed?: boolean }) => {
-      try {
-        if (next.height !== undefined) localStorage.setItem(storageKey(username, "h"), String(Math.round(next.height)));
-        if (next.collapsed !== undefined) localStorage.setItem(storageKey(username, "collapsed"), next.collapsed ? "1" : "0");
-      } catch {
-        /* ignore persistence failures */
-      }
-    },
-    [username],
-  );
+  function patchCurrent(patch: Partial<AssistantSession>) {
+    updateSession(activeTraineeId, (previous) => ({ ...previous, ...patch }));
+  }
+  const polishing = loading.polish;
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const isDrawer = isDesktop && !assistantIsColumn;
+  const busy = loading.sending || loading.task !== null || polishing;
 
   // Keep the latest message in view.
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [turns, notices, loading.sending, loading.task, collapsed]);
+  }, [activeTraineeId, turns, notices, polishBubbles, busy]);
 
-  const onDragMove = useCallback((e: PointerEvent) => {
-    const state = dragState.current;
-    if (!state) return;
-    const max = Math.round(window.innerHeight * 0.75);
-    const next = Math.min(Math.max(state.startHeight + (state.startY - e.clientY), MIN_HEIGHT), max);
-    setHeight(next);
-  }, []);
-
-  const onDragEnd = useCallback(() => {
-    dragState.current = null;
-    window.removeEventListener("pointermove", onDragMove);
-    window.removeEventListener("pointerup", onDragEnd);
-    setHeight((h) => {
-      persist({ height: h });
-      return h;
-    });
-  }, [onDragMove, persist]);
-
-  const startDrag = useCallback(
-    (e: React.PointerEvent) => {
-      e.preventDefault();
-      dragState.current = { startY: e.clientY, startHeight: height };
-      window.addEventListener("pointermove", onDragMove);
-      window.addEventListener("pointerup", onDragEnd);
-    },
-    [height, onDragMove, onDragEnd],
-  );
-
+  // Non-modal drawer (1024–1535px): focus moves in and Escape closes only while
+  // focus is inside the assistant. Tab may return to the review; we deliberately
+  // do NOT trap focus or claim aria-modal, since the review remains interactive.
+  // The column and the phone pane are regular regions, not overlays.
   useEffect(() => {
-    return () => {
-      window.removeEventListener("pointermove", onDragMove);
-      window.removeEventListener("pointerup", onDragEnd);
+    if (!isDrawer || !assistantOpen) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const frame = requestAnimationFrame(() => inputRef.current?.focus());
+    const onKey = (e: KeyboardEvent) => {
+      // An open modal dialog above the drawer owns Escape. The phone nav drawer stays
+      // mounted (inert) while closed, so inert dialogs don't count.
+      if (
+        e.key === "Escape" &&
+        panelRef.current?.contains(document.activeElement) &&
+        !document.querySelector("[aria-modal=true]:not([inert])")
+      ) {
+        closeAssistant();
+      }
     };
-  }, [onDragMove, onDragEnd]);
-
-  function toggleCollapsed() {
-    setCollapsed((c) => {
-      persist({ collapsed: !c });
-      return !c;
-    });
-  }
-
-  function handleKeyResize(e: React.KeyboardEvent) {
-    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-      e.preventDefault();
-      setHeight((h) => {
-        const max = Math.round(window.innerHeight * 0.75);
-        const next = Math.min(Math.max(h + (e.key === "ArrowUp" ? 24 : -24), MIN_HEIGHT), max);
-        persist({ height: next });
-        return next;
-      });
-    }
-  }
+    document.addEventListener("keydown", onKey);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", onKey);
+      if (previouslyFocused && document.contains(previouslyFocused)) previouslyFocused.focus();
+    };
+  }, [isDrawer, assistantOpen, closeAssistant]);
 
   function doSend() {
     const text = input.trim();
     if (!text || !selectedTrainee) return;
-    setInput("");
+    patchCurrent({ input: "" });
     void sendChat(text);
   }
 
@@ -183,25 +151,32 @@ export function AssistantPanel() {
   }
 
   async function runPolish() {
+    const requestTraineeId = activeTraineeId;
+    if (!requestTraineeId) return;
     const text = input.trim();
-    setPolishNote(null);
+    updateSession(requestTraineeId, (previous) => ({ ...previous, polishNote: null }));
     if (!text) {
-      setPolishNote("כתבו הערות גולמיות בתיבה ואז לחצו „נסח משוב”.");
+      updateSession(requestTraineeId, (previous) => ({
+        ...previous,
+        polishNote: "כתבו הערות גולמיות בתיבה, ואז בחרו „ניסוח משוב”.",
+      }));
       return;
     }
-    setPolishing(true);
-    try {
-      const res = await polish({ rawText: text, feedbackType: "other" });
-      if (!res) return; // provider surfaced an error banner
-      if (res.result.status === "ok") {
-        polishSeq.current += 1;
-        setPolishBubbles((prev) => [...prev, { id: `p${polishSeq.current}`, text: res.result.status === "ok" ? res.result.output.polishedText : "" }]);
-        setInput("");
-      } else {
-        setPolishNote(res.result.message);
-      }
-    } finally {
-      setPolishing(false);
+    const res = await polish({ rawText: text, feedbackType: "other" });
+    if (!res) return; // the provider surfaced an error banner
+    if (res.result.status === "ok") {
+      polishSeq.current += 1;
+      const polished = res.result.output.polishedText;
+      const resultId = `p${polishSeq.current}`;
+      updateSession(requestTraineeId, (previous) => ({
+        ...previous,
+        polishBubbles: [...previous.polishBubbles, { id: resultId, text: polished }],
+        // Do not wipe edits made while the request was in flight.
+        input: previous.input.trim() === text ? "" : previous.input,
+      }));
+    } else {
+      const message = res.result.message;
+      updateSession(requestTraineeId, (previous) => ({ ...previous, polishNote: message }));
     }
   }
 
@@ -214,184 +189,170 @@ export function AssistantPanel() {
   const showSuggestions = selectedTrainee && turns.length === 0 && notices.length === 0 && polishBubbles.length === 0;
 
   return (
-    <section
-      className={cn(
-        "flex flex-col bg-surface",
-        isWide ? "h-full min-h-0 border-s border-line" : "shrink-0 border-t border-line",
-      )}
-      aria-label="עוזר AI"
-    >
-      {/* Resize handle — only in the stacked layout (a side column sizes to the row). */}
-      {!collapsed && !isWide ? (
-        <div
-          role="separator"
-          aria-orientation="horizontal"
-          aria-label="שינוי גובה פאנל הבוט"
-          tabIndex={0}
-          onPointerDown={startDrag}
-          onKeyDown={handleKeyResize}
-          className="group flex h-2 cursor-row-resize items-center justify-center focus-visible:outline-none"
-        >
-          <span className="h-1 w-10 rounded-full bg-line-strong transition-colors group-hover:bg-subtle group-focus-visible:bg-slate-900" />
-        </div>
-      ) : null}
-
+    <section ref={panelRef} className="flex h-full min-h-0 w-full flex-col bg-surface" aria-labelledby="ws-assistant-title">
       {/* Header */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-2 pt-1">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="truncate text-sm font-semibold text-ink">
-            עוזר AI{selectedTrainee ? ` · ${selectedTrainee.fullName}` : ""}
-          </span>
-          {selectedTrainee ? (
-            <span className="shrink-0 text-xs text-muted">{selectedSourceCount} מקורות מסומנים</span>
-          ) : null}
-          {ai.mock ? (
-            <span className="shrink-0 rounded-md border border-line-strong bg-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-muted">
-              מצב פיתוח · Mock
-            </span>
-          ) : null}
+      <div className="flex shrink-0 items-start gap-2 border-b border-line py-3 pe-2 ps-4">
+        <div className="min-w-0 flex-1">
+          <h2 id="ws-assistant-title" className="flex flex-wrap items-center gap-x-2 text-base font-semibold text-ink">
+            עוזר AI
+            {ai.mock ? (
+              <span className="rounded-md border border-line-strong px-1.5 text-xs font-medium text-muted">מצב פיתוח · Mock</span>
+            ) : null}
+          </h2>
+          <p className="truncate text-sm text-muted">
+            {selectedTrainee ? (
+              <>
+                על <span dir="auto">{selectedTrainee.fullName}</span> · {selectedSourceCount} משובים כמקור
+              </>
+            ) : (
+              "לא נבחר חניך"
+            )}
+          </p>
         </div>
-
-        <div className="flex items-center gap-2">
-          {selectedTrainee && conversations.length > 0 ? (
-            <select
-              value={activeConversationId ?? ""}
-              onChange={(e) => e.target.value && selectConversation(e.target.value)}
-              aria-label="בחירת שיחה"
-              className="max-w-[10rem] rounded-lg border border-line-strong bg-surface px-2 py-1 text-xs text-ink focus-visible:border-ink focus-visible:outline-none"
-            >
-              {activeConversationId ? null : <option value="">שיחה חדשה</option>}
-              {conversations.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title || "שיחה"}
-                </option>
-              ))}
-            </select>
-          ) : null}
-          {selectedTrainee ? (
-            <button
-              type="button"
-              onClick={() => startNewConversation()}
-              aria-label="שיחה חדשה"
-              className="inline-flex h-7 items-center gap-1 rounded-lg border border-line-strong bg-surface px-2 text-xs text-ink transition-colors hover:bg-surface-2"
-            >
-              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-              שיחה חדשה
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            aria-expanded={!collapsed}
-            aria-label={collapsed ? "פתיחת פאנל הבוט" : "כיווץ פאנל הבוט"}
-            className="grid h-7 w-7 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-ink"
-          >
-            {collapsed ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={closeAssistant}
+          aria-label={assistantIsColumn ? "הסתרת העוזר" : "סגירת העוזר"}
+          title={assistantIsColumn ? "הסתרת העוזר" : "סגירת העוזר"}
+          className="hidden h-10 w-10 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus lg:grid"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
       </div>
 
-      {/* Body */}
-      {!collapsed ? (
-        <div
-          className={cn("flex min-h-0 flex-col", isWide && "flex-1")}
-          style={isWide ? undefined : { height: hydrated ? height : DEFAULT_HEIGHT }}
-        >
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-            {!selectedTrainee ? (
-              <p className="grid h-full place-items-center text-center text-sm text-muted">
-                בחרו חניך מהרשימה כדי לפתוח שיחה עם העוזר.
-              </p>
-            ) : (
-              <div className="mx-auto flex max-w-3xl flex-col gap-3">
-                {!ai.configured ? (
-                  <p className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-muted">
-                    AI עדיין לא מחובר. אפשר לכתוב הערות ומשובים; תשובות העוזר יופעלו לאחר חיבור הספק.
-                  </p>
-                ) : null}
-
-                {showSuggestions ? (
-                  <div className="flex flex-wrap gap-2">
-                    {SUGGESTIONS.map((s) => (
-                      <button
-                        key={s.label}
-                        type="button"
-                        onClick={() => onSuggestion(s)}
-                        disabled={loading.task !== null || loading.sending}
-                        className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink transition-colors hover:bg-surface-2 disabled:opacity-50"
-                      >
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-
-                {turns.map((t) => (
-                  <TurnBubble key={t.id} turn={t} />
-                ))}
-                {notices.map((n) => (
-                  <NoticeBubble key={n.id} notice={n} />
-                ))}
-                {polishBubbles.map((p) => (
-                  <PolishResultBubble key={p.id} text={p.text} onSave={() => setSaveTarget(p.text)} />
-                ))}
-                {polishNote ? (
-                  <div className="max-w-[85%] self-start rounded-2xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-muted">{polishNote}</div>
-                ) : null}
-                {loading.sending || loading.task || polishing ? (
-                  <div className="ws-row-enter self-start rounded-2xl border border-line bg-surface px-4 py-2 text-sm text-muted">…</div>
-                ) : null}
-              </div>
-            )}
-          </div>
-
-          {/* Composer */}
-          <form onSubmit={submit} className="flex items-end gap-2 border-t border-line px-4 py-3">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  doSend();
-                }
-              }}
-              rows={1}
-              disabled={!selectedTrainee || loading.sending}
-              placeholder={selectedTrainee ? "כתבו הודעה לעוזר, או הערות גולמיות ואז „נסח”…" : "בחרו חניך תחילה"}
-              aria-label="הודעה לעוזר"
-              className="max-h-32 min-h-[2.75rem] flex-1 resize-none rounded-xl border border-line-strong bg-surface px-3 py-2.5 text-sm leading-relaxed text-ink placeholder:text-subtle focus-visible:border-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15 disabled:opacity-50"
-            />
-            {selectedTrainee ? (
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => void runPolish()}
-                disabled={!input.trim() || polishing}
-                aria-label="נסח משוב מההערות"
-                className="h-11 shrink-0 rounded-xl"
+      {selectedTrainee ? (
+        <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2">
+          {conversations.length > 0 ? (
+            <div className="relative min-w-0 flex-1">
+              <select
+                value={activeConversationId ?? ""}
+                onChange={(e) => e.target.value && selectConversation(e.target.value)}
+                aria-label="בחירת שיחה"
+                className="h-10 w-full appearance-none truncate rounded-lg border border-control bg-surface pe-8 ps-3 text-base text-ink focus-visible:border-focus focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25 sm:text-sm"
               >
-                <Sparkles className="h-4 w-4" aria-hidden="true" />
-                <span className="hidden sm:inline">נסח</span>
-              </Button>
-            ) : null}
-            <Button type="submit" disabled={!selectedTrainee || !input.trim() || loading.sending} className="h-11 shrink-0 rounded-xl">
-              <Send className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden sm:inline">שליחה</span>
-            </Button>
-          </form>
+                {activeConversationId ? null : <option value="">שיחה חדשה</option>}
+                {conversations.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title || "שיחה ללא כותרת"}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute inset-y-0 end-2.5 my-auto h-4 w-4 text-subtle" aria-hidden="true" />
+            </div>
+          ) : (
+            <p className="min-w-0 flex-1 text-sm text-subtle">אין עדיין שיחות</p>
+          )}
+          <Button variant="secondary" size="sm" onClick={() => startNewConversation()} className="shrink-0">
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            שיחה חדשה
+          </Button>
         </div>
       ) : null}
 
+      {/* Messages */}
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4" aria-busy={busy}>
+        {!selectedTrainee ? (
+          <p className="grid h-full place-items-center text-center text-sm text-muted">בחרו חניך כדי לשוחח עם העוזר עליו.</p>
+        ) : (
+          <div className="flex flex-col gap-3" aria-live="polite">
+            {!ai.configured ? (
+              <p className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-muted">
+                העוזר עדיין לא מחובר. אפשר לכתוב משובים כרגיל; תשובות יופעלו לאחר חיבור הספק.
+              </p>
+            ) : null}
+
+            {showSuggestions ? (
+              <div className="space-y-2">
+                <p className="text-sm text-muted">אפשר להתחיל מאחת הפעולות:</p>
+                <div className="flex flex-wrap gap-2">
+                  {SUGGESTIONS.map((s) => (
+                    <Button key={s.label} variant="secondary" size="sm" onClick={() => onSuggestion(s)} disabled={busy}>
+                      {s.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {turns.map((t) => (
+              <TurnBubble key={t.id} turn={t} />
+            ))}
+            {notices.map((n) => (
+              <NoticeBubble key={n.id} notice={n} />
+            ))}
+            {polishBubbles.map((p) => (
+              <PolishResultBubble key={p.id} text={p.text} onSave={() => activeTraineeId && setSaveTarget({ traineeId: activeTraineeId, text: p.text })} />
+            ))}
+            {polishNote ? (
+              <div className="max-w-[90%] self-start rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-muted">{polishNote}</div>
+            ) : null}
+            {busy ? (
+              <div className="ws-row-enter inline-flex items-center gap-2 self-start rounded-xl border border-line bg-surface px-4 py-2 text-sm text-muted">
+                <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                {polishing ? "מנסח…" : loading.task ? "מפיק…" : "חושב…"}
+              </div>
+            ) : null}
+          </div>
+        )}
+      </div>
+
+      {/* Composer */}
+      <form onSubmit={submit} className="shrink-0 space-y-2 border-t border-line px-4 py-3">
+        <label htmlFor="ws-assistant-input" className="sr-only">
+          הודעה לעוזר
+        </label>
+        <textarea
+          id="ws-assistant-input"
+          ref={inputRef}
+          value={input}
+          onChange={(e) => patchCurrent({ input: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              doSend();
+            }
+          }}
+          rows={2}
+          aria-describedby="ws-assistant-hint"
+          disabled={!selectedTrainee || loading.sending}
+          placeholder={selectedTrainee ? "שאלה לעוזר, או הערות גולמיות לניסוח משוב" : "בחרו חניך תחילה"}
+          dir="auto"
+          className="max-h-40 min-h-[3.25rem] w-full resize-none rounded-lg border border-control bg-surface px-3 py-2.5 text-base leading-relaxed text-ink placeholder:text-subtle focus-visible:border-focus focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25 disabled:opacity-50 sm:text-sm"
+        />
+        <p id="ws-assistant-hint" className="sr-only">
+          Enter לשליחה, Shift+Enter לשורה חדשה.
+        </p>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex items-center gap-2">
+            {selectedTrainee ? (
+              <Button type="button" variant="secondary" size="sm" onClick={() => void runPolish()} disabled={!input.trim() || polishing}>
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+                ניסוח משוב
+              </Button>
+            ) : null}
+            <Button type="submit" size="sm" disabled={!selectedTrainee || !input.trim() || loading.sending}>
+              <Send className="h-4 w-4 -scale-x-100" aria-hidden="true" />
+              שליחה
+            </Button>
+          </div>
+        </div>
+      </form>
+
       <SavePolishAsFeedbackDialog
-        text={saveTarget}
+        text={saveText}
         onClose={() => setSaveTarget(null)}
         onSave={async (title, text, feedbackType) => {
-          const okSaved = await addFeedback({ feedbackType, title, rawText: text });
-          if (okSaved) {
-            setSaveTarget(null);
-            setPolishBubbles((prev) => prev.filter((p) => p.text !== text));
+          const saveTraineeId = activeTraineeId;
+          if (!saveTraineeId) return { ok: false, error: "לא נבחר חניך." };
+          const result = await addFeedback({ feedbackType, title, rawText: text });
+          if (result.ok) {
+            setSaveTarget((current) => (current?.traineeId === saveTraineeId ? null : current));
+            updateSession(saveTraineeId, (previous) => ({
+              ...previous,
+              polishBubbles: previous.polishBubbles.filter((p) => p.text !== text),
+            }));
           }
+          return result;
         }}
       />
     </section>
@@ -410,16 +371,16 @@ function PolishResultBubble({ text, onSave }: { text: string; onSave: () => void
     }
   }
   return (
-    <div className="ws-row-enter max-w-[85%] self-start rounded-2xl border border-line bg-surface px-4 py-2.5 text-sm text-ink">
-      <p className="mb-1 text-xs font-medium text-muted">נוסח מוצע (AI) — לא נשמר עד לאישורכם:</p>
-      <p className="whitespace-pre-wrap break-words leading-relaxed">{text}</p>
-      <div className="mt-2 flex justify-end gap-3">
-        <button type="button" onClick={copy} className="text-xs font-medium text-muted hover:text-ink">
-          {copied ? "הועתק" : "העתק"}
-        </button>
-        <button type="button" onClick={onSave} className="text-xs font-medium text-brand-action hover:text-brand-action-hover">
-          שמור כמשוב
-        </button>
+    <div className="ws-row-enter max-w-[92%] self-start rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink">
+      <p className="mb-1 text-sm font-medium text-muted">נוסח מוצע — לא נשמר עד שתאשרו:</p>
+      <p className="whitespace-pre-wrap break-words text-base leading-relaxed" dir="auto">{text}</p>
+      <div className="mt-2 flex flex-wrap justify-end gap-1">
+        <Button variant="quiet" size="sm" onClick={copy}>
+          {copied ? "הועתק" : "העתקה"}
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onSave}>
+          שמירה כמשוב
+        </Button>
       </div>
     </div>
   );
@@ -432,10 +393,10 @@ function SavePolishAsFeedbackDialog({
 }: {
   text: string | null;
   onClose: () => void;
-  onSave: (title: string, text: string, feedbackType: FeedbackType) => Promise<void>;
+  onSave: (title: string, text: string, feedbackType: FeedbackType) => Promise<SaveResult>;
 }) {
   return (
-    <Dialog open={text !== null} onClose={onClose} title="שמירת נוסח כמשוב">
+    <Dialog open={text !== null} onClose={onClose} title="שמירת הנוסח כמשוב">
       {text !== null ? <SavePolishForm initialText={text} onClose={onClose} onSave={onSave} /> : null}
     </Dialog>
   );
@@ -448,7 +409,7 @@ function SavePolishForm({
 }: {
   initialText: string;
   onClose: () => void;
-  onSave: (title: string, text: string, feedbackType: FeedbackType) => Promise<void>;
+  onSave: (title: string, text: string, feedbackType: FeedbackType) => Promise<SaveResult>;
 }) {
   const [title, setTitle] = useState("");
   const [text, setText] = useState(initialText);
@@ -465,38 +426,37 @@ function SavePolishForm({
     setErr(null);
     setSaving(true);
     try {
-      await onSave(title.trim(), text.trim(), feedbackType);
+      const result = await onSave(title.trim(), text.trim(), feedbackType);
+      if (!result.ok) setErr(`${result.error} הנוסח נשאר בטופס — אפשר לנסות שוב.`);
+    } catch {
+      setErr("שמירת המשוב נכשלה. הנוסח נשאר בטופס — אפשר לנסות שוב.");
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3" noValidate>
-      <p className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-muted">
-        המשוב נשמר רק לאחר אישור. אפשר לערוך את הנוסח לפני השמירה.
-      </p>
-      {err ? <p role="alert" className="rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-sm text-danger">{err}</p> : null}
+    <form onSubmit={submit} className="space-y-4" noValidate aria-busy={saving}>
+      <p className="text-sm text-muted">המשוב נשמר רק לאחר אישור. אפשר לערוך את הנוסח לפני השמירה.</p>
+      {err ? (
+        <p role="alert" className="rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-sm text-danger">
+          {err}
+        </p>
+      ) : null}
       <Field label="כותרת" htmlFor="save-fb-title" required>
-        <Input id="save-fb-title" value={title} onChange={(e) => setTitle(e.target.value)} disabled={saving} />
+        <Input id="save-fb-title" value={title} onChange={(e) => setTitle(e.target.value)} disabled={saving} dir="auto" />
       </Field>
       <Field label="סוג המשוב" htmlFor="save-fb-type">
-        <select
-          id="save-fb-type"
-          value={feedbackType}
-          onChange={(e) => setFeedbackType(e.target.value as FeedbackType)}
-          disabled={saving}
-          className="h-10 w-full rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink focus-visible:border-ink focus-visible:outline-none"
-        >
+        <Select id="save-fb-type" value={feedbackType} onChange={(e) => setFeedbackType(e.target.value as FeedbackType)} disabled={saving}>
           {FEEDBACK_TYPES.map((t) => (
             <option key={t} value={t}>
               {FEEDBACK_TYPE_LABELS[t]}
             </option>
           ))}
-        </select>
+        </Select>
       </Field>
       <Field label="נוסח המשוב" htmlFor="save-fb-text" required>
-        <Textarea id="save-fb-text" rows={6} value={text} onChange={(e) => setText(e.target.value)} disabled={saving} />
+        <Textarea id="save-fb-text" rows={7} value={text} onChange={(e) => setText(e.target.value)} disabled={saving} dir="auto" />
       </Field>
       <div className="flex justify-end gap-2 pt-1">
         <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
@@ -515,12 +475,13 @@ function TurnBubble({ turn }: { turn: TurnDTO }) {
   return (
     <div
       className={cn(
-        "max-w-[85%] break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+        "max-w-[92%] break-words rounded-xl px-4 py-2.5 text-[0.9375rem] leading-relaxed",
         isUser
-          ? "self-end whitespace-pre-wrap bg-slate-900 text-white"
+          ? "self-end whitespace-pre-wrap bg-ink text-white"
           : // The bot answers in Markdown — render it, trimming the outer block margins.
             "self-start border border-line bg-surface text-ink [&_div>*:first-child]:mt-0 [&_div>*:last-child]:mb-0",
       )}
+      dir="auto"
     >
       {isUser ? turn.content : <KnowledgeMarkdown>{turn.content}</KnowledgeMarkdown>}
     </div>
@@ -531,8 +492,9 @@ function NoticeBubble({ notice }: { notice: ChatNotice }) {
   const isError = notice.kind === "error";
   return (
     <div
+      role={isError ? "alert" : undefined}
       className={cn(
-        "max-w-[85%] self-start rounded-2xl border px-4 py-2.5 text-sm leading-relaxed",
+        "max-w-[92%] self-start rounded-xl border px-4 py-2.5 text-sm leading-relaxed",
         isError ? "border-danger-line bg-danger-surface text-danger" : "border-line bg-surface-2 text-muted",
       )}
     >

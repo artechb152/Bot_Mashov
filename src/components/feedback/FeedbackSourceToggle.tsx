@@ -1,32 +1,35 @@
 "use client";
 
 /**
- * A small "use as AI source" toggle for a single feedback entry. Presentational +
- * controlled — the parent owns the selection Set (default: all selected). `compact`
- * hides the text label (used in the dense feedback row), keeping the accessible name.
+ * The "use as AI source" checkbox for a single feedback entry. Presentational +
+ * controlled — the parent owns the selection Set (default: all selected). The whole
+ * label is the hit area (>=40px); `itemLabel` names the entry for screen readers.
  */
 export function FeedbackSourceToggle({
   checked,
   onChange,
   disabled,
-  compact = false,
+  itemLabel,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
-  compact?: boolean;
+  itemLabel?: string;
 }) {
   return (
-    <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted" title="שימוש במשוב כמקור ל-AI">
+    <label
+      className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 self-center rounded-lg px-2 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-ink has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus"
+      title="כשהתיבה מסומנת, העוזר משתמש במשוב הזה"
+    >
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
         disabled={disabled}
-        className="h-4 w-4 rounded border-line accent-brand-action"
-        aria-label="שימוש במשוב כמקור ל-AI"
+        className="h-4 w-4 rounded border-control focus-visible:outline-none"
+        aria-label={itemLabel ? `שימוש ב״${itemLabel}״ כמקור לעוזר` : "שימוש במשוב כמקור לעוזר"}
       />
-      {compact ? null : "מקור ל-AI"}
+      <span aria-hidden="true">מקור</span>
     </label>
   );
 }

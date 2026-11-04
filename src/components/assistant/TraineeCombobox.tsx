@@ -73,8 +73,8 @@ export function TraineeCombobox({ trainees, value, onChange, id }: TraineeCombob
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
-          "flex h-10 w-full items-center gap-2 rounded-lg border border-line-strong bg-surface ps-3 pe-9 text-sm text-ink transition-colors",
-          "focus-visible:border-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15",
+          "flex h-10 w-full items-center gap-2 rounded-lg border border-control bg-surface ps-3 pe-9 text-sm text-ink transition-colors",
+          "focus-visible:border-focus focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25",
         )}
       >
         <User className="h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />
@@ -89,7 +89,7 @@ export function TraineeCombobox({ trainees, value, onChange, id }: TraineeCombob
           type="button"
           aria-label="ניקוי בחירת חניך"
           onClick={() => onChange("")}
-          className="absolute inset-y-0 end-2 my-auto grid h-6 w-6 place-items-center rounded-md text-subtle transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15"
+          className="absolute inset-y-0 end-2 my-auto grid h-6 w-6 place-items-center rounded-md text-subtle transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -101,9 +101,9 @@ export function TraineeCombobox({ trainees, value, onChange, id }: TraineeCombob
       )}
 
       {open && (
-        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-line-strong bg-surface shadow-lg">
+        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-control bg-surface shadow-lg">
           <div className="border-b border-line p-2">
-            <div className="flex h-9 items-center gap-2 rounded-md border border-line-strong bg-surface px-2">
+            <div className="flex h-9 items-center gap-2 rounded-md border border-control bg-surface px-2">
               <Search className="h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />
               <input
                 ref={searchRef}

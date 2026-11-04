@@ -34,15 +34,15 @@ export function DevelopmentTimeline({ data }: { data: DevelopmentTimelineOutput 
       {points.map((p, i) => (
         <li key={i} className="relative">
           <span
-            className="absolute -start-[23px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-slate-400"
+            className="absolute -start-[23px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-subtle"
             aria-hidden="true"
           />
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="text-sm font-medium text-ink">{p.title}</span>
-            <span className="text-xs text-subtle">{KIND_LABELS[p.kind] ?? ""}</span>
-            {p.at ? <span className="text-xs tabular-nums text-subtle">· {formatDate(p.at)}</span> : null}
+            <span className="text-base font-medium text-ink">{p.title}</span>
+            <span className="text-sm text-subtle">{KIND_LABELS[p.kind] ?? ""}</span>
+            {p.at ? <span className="text-sm tabular-nums text-subtle">· {formatDate(p.at)}</span> : null}
           </div>
-          {p.detail ? <p className="mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-muted">{p.detail}</p> : null}
+          {p.detail ? <p className="mt-0.5 whitespace-pre-wrap break-words text-base leading-relaxed text-muted">{p.detail}</p> : null}
         </li>
       ))}
     </ol>

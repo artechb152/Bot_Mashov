@@ -12,8 +12,8 @@ export function Select({ className, children, ...props }: SelectProps) {
     <div className="relative">
       <select
         className={cn(
-          "h-10 w-full appearance-none rounded-lg border border-line-strong bg-surface ps-3 pe-9 text-sm text-ink",
-          "transition-colors focus-visible:border-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15",
+          "h-11 w-full appearance-none rounded-lg border border-control bg-surface ps-3 pe-9 text-base text-ink sm:h-10 sm:text-sm",
+          "transition-colors focus-visible:border-focus focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25",
           "disabled:cursor-not-allowed disabled:opacity-50",
           className,
         )}

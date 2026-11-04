@@ -47,9 +47,9 @@ export function CourseChoice({
               key={course}
               className={cn(
                 "cursor-pointer rounded-lg px-4 py-2.5 text-center text-sm font-semibold transition-colors",
-                "focus-within:outline-none focus-within:ring-2 focus-within:ring-slate-900/20",
+                "focus-within:outline-none focus-within:ring-2 focus-within:ring-focus",
                 active
-                  ? "bg-slate-900 text-white"
+                  ? "bg-ink text-white"
                   : "text-muted hover:bg-surface-2 hover:text-ink",
                 disabled && "cursor-not-allowed opacity-60",
               )}

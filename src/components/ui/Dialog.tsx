@@ -36,6 +36,13 @@ export function Dialog({ open, onClose, title, ariaLabel, children, className, b
   // Portals need document.body — only available after mount (avoids SSR mismatch).
   useEffect(() => setMounted(true), []);
 
+  // Callers often pass an inline `onClose`; read it through a ref so a parent
+  // re-render never re-runs the open effect (which would steal focus mid-typing).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
 
@@ -44,7 +51,7 @@ export function Dialog({ open, onClose, title, ariaLabel, children, className, b
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       // Trap Tab within the panel so keyboard focus can't escape to the page behind.
@@ -84,7 +91,7 @@ export function Dialog({ open, onClose, title, ariaLabel, children, className, b
       document.body.style.overflow = previousOverflow;
       previouslyFocused?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open || !mounted) return null;
 
@@ -105,13 +112,13 @@ export function Dialog({ open, onClose, title, ariaLabel, children, className, b
         )}
       >
         {title ? (
-          <div className="flex items-center justify-between border-b border-line px-5 py-4">
+          <div className="flex items-center justify-between gap-3 border-b border-line py-3 pe-3 ps-5">
             <h2 className="text-base font-semibold text-ink">{title}</h2>
             <button
               type="button"
               onClick={onClose}
               aria-label="סגירה"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <X className="h-4 w-4" aria-hidden="true" />
             </button>

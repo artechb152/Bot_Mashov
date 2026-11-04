@@ -15,7 +15,7 @@ export function SettingsButton({ className }: { className?: string }) {
       aria-label="הגדרות"
       title="הגדרות"
       className={cn(
-        "grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15",
+        "grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
         className,
       )}
     >

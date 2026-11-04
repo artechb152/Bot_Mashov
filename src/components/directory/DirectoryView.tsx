@@ -61,11 +61,11 @@ function Tile({ u, onOpen, onPreview, onPreviewEnd }: { u: DirectoryCard } & Pre
         "group relative flex aspect-square w-full items-center justify-center rounded-xl border border-line bg-surface",
         "transition duration-200 ease-out",
         "hover:z-10 hover:-translate-y-0.5 hover:scale-[1.06] hover:border-slate-300 hover:bg-surface-2 hover:shadow-md",
-        "focus-visible:z-10 focus-visible:scale-[1.06] focus-visible:border-slate-400 focus-visible:bg-surface-2 focus-visible:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15",
+        "focus-visible:z-10 focus-visible:scale-[1.06] focus-visible:border-slate-400 focus-visible:bg-surface-2 focus-visible:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
         "motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:hover:scale-100 motion-reduce:focus-visible:scale-100",
       )}
     >
-      <span className="grid h-9 w-9 place-items-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+      <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-primary text-sm font-semibold text-white">
         {name.charAt(0).toUpperCase()}
       </span>
       {u.isRootSuperAdmin ? (
@@ -113,7 +113,7 @@ function Preview({ u, anchorRef }: { u: DirectoryCard; anchorRef: RefObject<HTML
       className="pointer-events-none z-[45] rounded-xl border border-line bg-surface p-3 shadow-lg"
     >
       <div className="flex items-center gap-2.5">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-slate-900 text-base font-semibold text-white">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-primary text-base font-semibold text-white">
           {name.charAt(0).toUpperCase()}
         </span>
         <div className="min-w-0">
@@ -214,7 +214,7 @@ export function DirectoryView({
         {selected ? (
           <div>
             <div className="flex items-center gap-3">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-slate-900 text-base font-semibold text-white">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-brand-primary text-base font-semibold text-white">
                 {displayNameOf(selected).charAt(0).toUpperCase()}
               </span>
               <div className="min-w-0">

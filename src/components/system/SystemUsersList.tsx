@@ -131,11 +131,11 @@ export function SystemUsersList({ users }: { users: Row[] }) {
             <THead>
               <TR>
                 <TH>שם</TH>
-                <TH>תפקיד</TH>
-                <TH>קורס</TH>
+                <TH className="hidden md:table-cell">תפקיד</TH>
+                <TH className="hidden md:table-cell">קורס</TH>
                 <TH>סטטוס</TH>
-                <TH>חניכים</TH>
-                <TH><span className="sr-only">פעולות</span></TH>
+                <TH className="hidden sm:table-cell">חניכים</TH>
+                <TH className="hidden sm:table-cell"><span className="sr-only">פעולות</span></TH>
               </TR>
             </THead>
             <TBody>
@@ -143,19 +143,25 @@ export function SystemUsersList({ users }: { users: Row[] }) {
                 <TR key={u.id}>
                   <TD className="font-medium">
                     <span className="inline-flex items-center gap-1.5">
-                      {u.displayName || u.username}
+                      <Link href={`/system/users/${u.id}`} className="hover:underline" dir="auto">
+                        {u.displayName || u.username}
+                      </Link>
                       {u.isRootSuperAdmin ? <Crown className="h-3.5 w-3.5 text-amber-500" aria-label="מנהל־על ראשי" /> : null}
                     </span>
-                    <span className="block text-xs text-subtle">{u.username}</span>
+                    <span className="block break-all text-sm font-normal text-subtle" dir="auto">{u.username}</span>
+                    <span className="block text-sm font-normal text-muted md:hidden">
+                      {USER_ROLE_LABELS[u.role]}
+                      {u.courseType ? ` · ${COURSE_LABELS[u.courseType]}` : ""}
+                    </span>
                   </TD>
-                  <TD className="text-muted">
+                  <TD className="hidden text-muted md:table-cell">
                     {USER_ROLE_LABELS[u.role]}
                     {u.adminPosition ? ` · ${ADMIN_POSITION_LABELS[u.adminPosition]}` : ""}
                   </TD>
-                  <TD className="text-muted">{u.courseType ? COURSE_LABELS[u.courseType] : "—"}</TD>
+                  <TD className="hidden text-muted md:table-cell">{u.courseType ? COURSE_LABELS[u.courseType] : "—"}</TD>
                   <TD className="text-muted">{USER_STATUS_LABELS[u.status]}</TD>
-                  <TD className="text-muted tabular-nums">{u.traineeCount}</TD>
-                  <TD className="text-end">
+                  <TD className="hidden text-muted tabular-nums sm:table-cell">{u.traineeCount}</TD>
+                  <TD className="hidden text-end sm:table-cell">
                     <Link href={`/system/users/${u.id}`} className="text-sm font-medium text-ink hover:underline">
                       ניהול
                     </Link>

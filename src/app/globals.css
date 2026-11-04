@@ -12,21 +12,36 @@
   --font-sans: var(--font-heebo), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", "Noto Sans Hebrew", Arial, sans-serif;
 
-  /* Restrained, operational neutral palette (monochrome slate + dark action). */
+  /*
+   * Neutral palette (slate) + the חונך+ action blue. Every text token passes
+   * WCAG AA (>=4.5:1) on canvas, surface and surface-2; see DESIGN.md.
+   */
   --color-canvas: #f8fafc;
   --color-surface: #ffffff;
   --color-surface-2: #f1f5f9;
   --color-ink: #0f172a;
-  --color-muted: #475569;
-  --color-subtle: #94a3b8;
-  --color-line: #e2e8f0;
-  --color-line-strong: #cbd5e1;
-  --color-primary: #0f172a;
-  --color-primary-ink: #f8fafc;
+  --color-muted: #475569;            /* secondary text — 6.9:1 on surface-2 */
+  --color-subtle: #5b6b80;           /* tertiary text (dates, hints) — 5.0:1 on surface-2 */
+  --color-line: #e2e8f0;             /* dividers, panel borders (decorative) */
+  --color-line-strong: #cbd5e1;      /* stronger dividers (decorative) */
+  --color-control: #8592a6;          /* form-control borders — 3:1 non-text contrast */
+  --color-primary: #2e6bd6;          /* = brand-action: the one primary CTA colour */
+  --color-primary-hover: #245bb8;
+  --color-primary-ink: #ffffff;      /* 5.0:1 on primary */
+  --color-focus: #2e6bd6;            /* keyboard focus ring */
+  --color-selected: #eaf1fc;         /* selected row / current item surface */
   --color-danger: #b91c1c;
   /* Sanctioned soft error/danger surface (the one allowed colour exception). */
   --color-danger-surface: #fef2f2;
   --color-danger-line: #fecaca;
+
+  /* Navigation rail (sidebar) — the brand's deep navy field. */
+  --color-rail: #1a2b49;
+  --color-rail-hover: #243e6b;
+  --color-rail-active: #2b4a7e;
+  --color-rail-line: #2c416a;
+  --color-rail-ink: #f8fafc;
+  --color-rail-muted: #b6c2d6;       /* 7.9:1 on rail */
 
   /*
    * Functional accents (§ "צבעים ופונקציונליות"). Used sparingly and only where the
@@ -66,13 +81,19 @@
 
   /* Baseline visible keyboard focus; interactive primitives refine it with rings. */
   :focus-visible {
-    outline: 2px solid var(--color-ink);
+    outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
 
   ::selection {
-    background-color: #0f172a;
-    color: #f8fafc;
+    background-color: var(--color-selected);
+    color: var(--color-ink);
+  }
+
+  /* Native controls (checkbox, radio, caret) pick up the action colour. */
+  :root {
+    accent-color: var(--color-primary);
+    caret-color: var(--color-primary);
   }
 }
 

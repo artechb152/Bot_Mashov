@@ -17,7 +17,7 @@ const mailTabs = [
 const tabClass = (active: boolean) =>
   cn(
     "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-    active ? "bg-slate-900 text-white" : "text-muted hover:bg-surface-2 hover:text-ink",
+    active ? "bg-ink text-white" : "text-muted hover:bg-surface-2 hover:text-ink",
   );
 
 /**

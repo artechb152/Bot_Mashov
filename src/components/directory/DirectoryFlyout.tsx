@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
+import { useModalFocus } from "@/lib/hooks/useModalFocus";
 import { DirectoryView } from "./DirectoryView";
 import type { Directory, DirectoryCard } from "@/lib/data/directory";
 
@@ -42,22 +43,26 @@ export function DirectoryFlyout({ open, onClose }: { open: boolean; onClose: () 
   // The profile modal owns Escape while it is open (kept in a ref so the key handler
   // stays subscribed once and always reads the latest value).
   const profileOpenRef = useRef(false);
+  const panelRef = useRef<HTMLElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setMounted(true), []);
 
+  // Modal behaviour: focus the search on open, trap Tab, Escape closes (after the
+  // profile modal, which owns Escape while open), focus returns to the trigger.
+  useModalFocus(panelRef, open && mounted, onClose, {
+    initialFocus: searchRef,
+    escapeEnabled: () => !profileOpenRef.current,
+  });
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !profileOpenRef.current) onClose();
-    };
-    document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [open, onClose]);
+  }, [open]);
 
   useEffect(() => {
     if (!open || dir) return; // fetch once, lazily
@@ -90,10 +95,12 @@ export function DirectoryFlyout({ open, onClose }: { open: boolean; onClose: () 
       {/* Transparent catcher — closes on outside-click, no heavy page darkening. */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
       <aside
+        ref={panelRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="אנשי המערכת"
-        className="absolute inset-y-0 start-0 flex w-full max-w-sm flex-col border-e border-line bg-canvas shadow-2xl lg:w-96"
+        className="absolute inset-y-0 start-0 flex w-full max-w-sm flex-col border-e border-line bg-canvas shadow-2xl focus:outline-none lg:w-96"
       >
         <div className="flex items-center justify-between border-b border-line bg-surface px-4 py-3">
           <h2 className="text-base font-semibold text-ink">אנשי המערכת</h2>
@@ -101,7 +108,7 @@ export function DirectoryFlyout({ open, onClose }: { open: boolean; onClose: () 
             type="button"
             onClick={onClose}
             aria-label="סגירה"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -111,12 +118,13 @@ export function DirectoryFlyout({ open, onClose }: { open: boolean; onClose: () 
           <div className="relative">
             <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
             <input
+              ref={searchRef}
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="חיפוש משתמש…"
               aria-label="חיפוש משתמש"
-              className="w-full rounded-lg border border-line bg-surface py-2 pe-3 ps-9 text-sm text-ink placeholder:text-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15"
+              className="h-11 w-full rounded-lg border border-control bg-surface py-2 pe-3 ps-9 text-base sm:h-10 sm:text-sm text-ink placeholder:text-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25 focus-visible:border-focus"
             />
           </div>
         </div>
@@ -127,7 +135,7 @@ export function DirectoryFlyout({ open, onClose }: { open: boolean; onClose: () 
         <div dir="ltr" className="min-h-0 flex-1 overflow-y-auto p-4">
           <div dir="rtl">
             {loading ? <p className="text-sm text-muted">טוען…</p> : null}
-            {error ? <p className="text-sm text-danger">{error}</p> : null}
+            {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
             {filtered ? (
               <DirectoryView
                 directory={filtered}
