@@ -9,3 +9,4 @@ export { Table, THead, TBody, TR, TH, TD } from "./Table";
 export { Dialog, type DialogProps } from "./Dialog";
 export { EmptyState, type EmptyStateProps } from "./EmptyState";
 export { PageHeader, type PageHeaderProps } from "./PageHeader";
+export { NavigationArrow } from "./NavigationArrow";
