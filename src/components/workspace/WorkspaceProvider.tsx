@@ -510,19 +510,26 @@ export function WorkspaceProvider({
   }, []);
 
   // --- Ensure an active conversation exists (create on demand) ----------------
-  const ensureConversation = useCallback(async (): Promise<ConversationDTO | null> => {
+  // `token` is the caller's loadToken, captured BEFORE this await. If the user has moved
+  // to another trainee meanwhile, the conversation still belongs to the original trainee
+  // (the caller may finish its server call), but nothing is written to the visible state.
+  const ensureConversation = useCallback(async (token: number): Promise<ConversationDTO | null> => {
     if (!selectedTraineeId) return null;
     if (activeConversation) return activeConversation;
     try {
       const conv = await api.createConversation(selectedTraineeId);
-      setConversations((prev) => [conv, ...prev]);
-      setActiveConversationId(conv.id);
-      setTurns([]);
-      setNotices([]);
+      if (loadToken.current === token) {
+        setConversations((prev) => [conv, ...prev]);
+        setActiveConversationId(conv.id);
+        setTurns([]);
+        setNotices([]);
+      }
       return conv;
     } catch (err) {
-      const isAccess = handleError(err, "פתיחת שיחה חדשה נכשלה.");
-      if (isAccess) setTraineeAccessError("notfound");
+      if (loadToken.current === token) {
+        const isAccess = handleError(err, "פתיחת שיחה חדשה נכשלה.");
+        if (isAccess) setTraineeAccessError("notfound");
+      }
       return null;
     }
   }, [selectedTraineeId, activeConversation, handleError]);
@@ -680,18 +687,26 @@ export function WorkspaceProvider({
   // --- Source selection ------------------------------------------------------
   const toggleSource = useCallback(
     async (feedbackId: string, checked: boolean) => {
-      const conv = await ensureConversation();
+      const token = loadToken.current;
+      const conv = await ensureConversation(token);
       if (!conv) return;
       const current = new Set(conv.selectedFeedbackIds);
       if (checked) current.add(feedbackId);
       else current.delete(feedbackId);
       const next = Array.from(current);
       // Optimistic — reflect the toggle immediately, reconcile with the server result.
-      setConversations((prev) => prev.map((c) => (c.id === conv.id ? { ...c, selectedFeedbackIds: next } : c)));
+      // After a trainee switch the server call still completes for the original trainee,
+      // but the visible state belongs to someone else and is left alone.
+      if (loadToken.current === token) {
+        setConversations((prev) => prev.map((c) => (c.id === conv.id ? { ...c, selectedFeedbackIds: next } : c)));
+      }
       try {
         const updated = await api.updateConversation(conv.id, { selectedFeedbackIds: next });
-        setConversations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+        if (loadToken.current === token) {
+          setConversations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+        }
       } catch (err) {
+        if (loadToken.current !== token) return;
         // Roll back the optimistic change.
         setConversations((prev) => prev.map((c) => (c.id === conv.id ? conv : c)));
         handleError(err, "עדכון בחירת המקורות נכשל.");
@@ -711,13 +726,17 @@ export function WorkspaceProvider({
 
   const startNewConversation = useCallback(async () => {
     if (!selectedTraineeId) return;
+    const token = loadToken.current;
     try {
       const conv = await api.createConversation(selectedTraineeId);
+      // Created for the original trainee; never shown under another one.
+      if (loadToken.current !== token) return;
       setConversations((prev) => [conv, ...prev]);
       setActiveConversationId(conv.id);
       setTurns([]);
       setNotices([]);
     } catch (err) {
+      if (loadToken.current !== token) return;
       const isAccess = handleError(err, "פתיחת שיחה חדשה נכשלה.");
       if (isAccess) setTraineeAccessError("notfound");
     }
@@ -744,10 +763,14 @@ export function WorkspaceProvider({
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
-      const conv = await ensureConversation();
-      if (!conv) return;
+      // Captured before any await: every later state write is tied to this trainee.
       const token = loadToken.current;
-      patchLoading({ sending: true });
+      const conv = await ensureConversation(token);
+      if (!conv) return;
+      // Navigated away while the conversation was being created: still deliver the
+      // message to the original trainee's conversation, without touching this view.
+      const visible = loadToken.current === token;
+      if (visible) patchLoading({ sending: true });
       try {
         const res = await api.sendMessage(conv.id, trimmed);
         if (loadToken.current !== token) return;
@@ -761,10 +784,11 @@ export function WorkspaceProvider({
         if (res.result.status === "not_configured") pushNotice("not_configured", res.result.message);
         else if (res.result.status === "error") pushNotice("error", res.result.message);
       } catch (err) {
+        if (loadToken.current !== token) return;
         const isAccess = handleError(err, "שליחת ההודעה נכשלה.");
         if (isAccess) setError("אין לך הרשאה לשלוח הודעה בשיחה זו.");
       } finally {
-        if (loadToken.current === token) patchLoading({ sending: false });
+        if (visible && loadToken.current === token) patchLoading({ sending: false });
       }
     },
     [ensureConversation, patchLoading, pushNotice, handleError],
@@ -792,6 +816,7 @@ export function WorkspaceProvider({
           pushNotice("error", res.result.message);
         }
       } catch (err) {
+        if (loadToken.current !== token) return;
         const isAccess = handleError(err, "הרצת המשימה נכשלה.");
         if (isAccess) setError("אין לך הרשאה להריץ משימה זו.");
       } finally {

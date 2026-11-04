@@ -100,3 +100,21 @@ or tab close with a draft raises the browser's `beforeunload` prompt. Not covere
 a real key chord (identical to `history.back()` in automation), Safari/Firefox, real devices,
 and switching between two real cohorts (the test account has one; the in-workspace Back case
 was exercised with a cohort-link entry instead).
+
+### §32 follow-up: asynchronous conversation actions (R8)
+
+Second review round: the assistant's conversation actions could still write A's result into
+B's view.
+
+| # | Finding | Fix |
+|---|---|---|
+| R8 | `ensureConversation`, `startNewConversation`, `toggleSource` and `sendChat` wrote conversation state, turns and notices after an `await` without checking the trainee. `sendChat` also captured its token *after* awaiting `ensureConversation`, so for a switch during creation the token was B's: A's reply was appended to B's turns and B was left in a "sending" state that nothing cleared. Late failures of `sendChat`, `runTask`, `toggleSource` and creation raised A's error banner over B. | The token is captured before the first `await` and every later state write, loading flag and error banner is gated on it. After a switch the server call for the original trainee still completes (a first message is still delivered to A's new conversation, a source toggle still reaches A's conversation), but the visible state belongs to B and is not touched. |
+
+Verification (Playwright, mocked `/api/ai/**` with controllable delays, demo trainees only, no
+real AI call, no database write): create delayed then switch; first send with delayed create
+and delayed reply; late create/message/task failures; source toggle that must create the
+conversation first, and one that only updates it. 30/30 at 1280, 1600 and 390. Against the
+previous provider code the same script fails 9 of 30. The §32 suite still passes (46/46,
+39/39, 39/39). Remaining limitation: if the user returns to A while A's creation is still
+pending, A's reload may not list the new conversation until the next reload.
+
