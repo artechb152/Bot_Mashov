@@ -37,12 +37,16 @@ friction · **P2** = consistency / polish.
 
 - **Breakpoints**: the assistant column starts at 1536px (Tailwind `2xl`) because below that a
   third column pushes the review under ~560px with the 256px rail. 1024–1535px uses a drawer.
-- **The drawer is non-modal-looking but focus-managed**: it overlays the review's inline-end
-  edge without a backdrop so the review stays visible; Escape and the close button dismiss it.
+- **Assistant drawer is non-modal**: it overlays the review's inline-end edge with no
+  backdrop; the review remains interactive. Opening moves focus to the assistant input,
+  Escape closes when focus is inside it, and focus returns to the trigger. Tab is **not**
+  trapped; do not represent the drawer as an aria-modal dialog.
 - **Back/forward**: trainee selection still uses `history.replaceState` (no history entry per
-  click, as before). Browser Back leaves the work area; with an unsaved draft the reload/close
-  prompt protects it. Pushing history per trainee was rejected to avoid desync with the
-  server-rendered cohort props.
+  trainee click). The unsaved-draft guard now adds a same-URL history checkpoint while
+  feedback drafts exist: Back prompts, cancel reinstates the checkpoint, accept continues
+  to the preceding page. On successful save/discard the checkpoint is released. This is
+  a newly added implementation that still needs real Playwright Back/Forward regression
+  testing; it is **not** a universal blocker for arbitrary programmatic router.push calls.
 - **Drafts are memory-only**: they survive trainee/tab/cohort switches but not a full reload,
   by design (no personal trainee content in localStorage without a privacy decision).
 - **Archiving a cohort** from the rail now asks for confirmation (reversible, but easy to hit).
@@ -59,3 +63,14 @@ friction · **P2** = consistency / polish.
   earlier product decision); they were not redesigned.
 - `/settings/*` keeps its own minimal layout outside the rail shell.
 - Cross-browser (Safari/Firefox) and real-device checks remain for manual acceptance.
+
+## PR #3 follow-up review (2026-11-04)
+
+The code review found previously untested context-isolation and navigation issues.
+The follow-up implementation includes: per-trainee in-memory assistant sessions (input,
+polish results, note and save dialog), origin-bound asynchronous polish responses,
+origin-specific feedback form cleanup after delayed save, keyed feedback-edit panels on
+trainee changes, and a same-URL browser-Back draft guard. The assistant drawer is now
+explicitly non-modal. These code changes were reviewed statically via GitHub; they have
+**not yet been verified against the running local application**. Before merging,
+execute the explicit regression scenarios in `docs/MANUAL_ACCEPTANCE_TESTS.md` §32.
